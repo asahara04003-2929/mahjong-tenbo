@@ -53,3 +53,212 @@
 
 .sendBtn{ margin-top:6px; }
 .amtBtn{ min-width:80px; }
+
+
+/* =========================
+   Game Screen (対局画面)
+========================= */
+
+#gameScreen {
+  /* 画像っぽい背景 */
+  background: #bfe6b0;
+  border: 2px solid #222;
+  padding: 14px;
+  max-width: 980px;
+  margin: 16px auto;
+  box-sizing: border-box;
+}
+
+.gs-title {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+}
+
+.gs-layout {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 14px;
+  align-items: start;
+}
+
+/* ---- 左：卓 ---- */
+.gs-tableWrap {
+  position: relative;
+  min-height: 420px;
+}
+
+.gs-riichiLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.gs-riichiText {
+  font-size: 14px;
+}
+
+.gs-table {
+  position: relative;
+  min-height: 380px;
+}
+
+/* 座席の箱 */
+.gs-seat {
+  position: absolute;
+  background: #fff;
+  border: 2px solid #222;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  text-align: center;
+  min-width: 120px;
+}
+
+.gs-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.gs-point {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.gs-diff {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+/* あなたのJSが付ける negative クラスに対応 */
+.negative {
+  color: #c00;
+}
+
+/* 送るボタン */
+.gs-sendBtn {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 2px solid #222;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* 北・西・南・自分 の配置（画像の雰囲気に寄せる） */
+.gs-north {
+  top: 38px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.gs-west {
+  top: 150px;
+  left: 10px;
+}
+
+.gs-south {
+  top: 150px;
+  right: 10px;
+}
+
+/* 自分（下の大きい枠） */
+.gs-self {
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: 360px;
+  padding: 16px 10px;
+}
+
+.gs-selfName {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.gs-selfPoint {
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: 1px;
+}
+
+/* ---- 右：操作パネル ---- */
+.gs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gs-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gs-card {
+  background: #fff;
+  border: 2px solid #222;
+  padding: 10px;
+}
+
+.gs-cardRow {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.gs-cardLabel {
+  width: 78px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.gs-cardValue {
+  font-size: 14px;
+}
+
+.gs-amountGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+/* ボタン共通 */
+.gs-btn {
+  background: #fff;
+  border: 2px solid #222;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+.gs-btn:active,
+.gs-sendBtn:active {
+  transform: translateY(1px);
+}
+
+.gs-btnWide {
+  min-width: 120px;
+}
+
+.gs-btnSub {
+  opacity: 0.9;
+}
+
+.gs-btnPrimary {
+  /* 色は控えめ（必要なら変えてOK） */
+  background: #fff;
+}
+
+.gs-btnDanger {
+  background: #fff;
+}
+
+/* ---- レスポンシブ ---- */
+@media (max-width: 860px) {
+  .gs-layout {
+    grid-template-columns: 1fr;
+  }
+  .gs-tableWrap {
+    min-height: 390px;
+  }
+}

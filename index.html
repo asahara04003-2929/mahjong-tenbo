@@ -2,7 +2,6 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>麻雀 点棒管理</title>
 
 <link rel="stylesheet" href="style.css">
 
@@ -17,8 +16,6 @@ select { margin-left:6px; }
 </head>
 
 <body>
-
-<h1>麻雀 点棒管理</h1>
 
 <!-- ========================================= -->
 <!-- ログイン -->
@@ -96,7 +93,7 @@ select { margin-left:6px; }
 <!-- 集計中画面 -->
 <!-- ========================================= -->
 <div id="calculatingScreen" class="hidden">
-  <h2>集計中</h2>
+  <h2>集計</h2>
 
   <!-- 006（上） -->
   <div id="calcTopName" style="text-align:center; margin-bottom:10px;">-</div>
@@ -195,72 +192,97 @@ select { margin-left:6px; }
 <!-- 対局画面 -->
 <!-- ========================================= -->
 <div id="gameScreen" class="hidden">
-  <h2>対局中</h2>
+  <h2 class="gs-title">対局中</h2>
 
-  <!-- 002 リーチ棒本数 / 013 追加 / 014 受け取り -->
-  <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-    <div>リーチ棒：<span id="riichiCount">0</span></div> <!-- 002 -->
-    <button id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button> <!-- 013 -->
-    <button id="btnRiichiTake" onclick="onRiichiTake()">受取</button> <!-- 014 -->
-  </div>
+  <div class="gs-layout">
+    <!-- =========================
+         左：卓（点数表示）
+    ========================== -->
+    <section class="gs-tableWrap">
+      <div class="gs-riichiLine">
+        <div class="gs-riichiText">リーチ棒：<span id="riichiCount">0</span></div>
+      </div>
 
-  <!-- ひし形テーブル -->
-  <div id="gameTable" class="gameTable">
-    <!-- 北(相手) -->
-    <div class="pos north">
-      <div class="name" id="nameN">-</div>          <!-- 003/004/005 相対表示 -->
-      <div class="point" id="pointN">-</div>        <!-- 006/007/008 -->
-      <div class="diff" id="diffN">-</div>          <!-- 009 -->
-      <button class="sendBtn" id="btnSendN" onclick="selectRecipient('N')">送る</button> <!-- 019 -->
-    </div>
+      <div id="gameTable" class="gs-table">
+        <!-- 北(相手) -->
+        <div class="gs-seat gs-north">
+          <div class="gs-name" id="nameN">-</div>
+          <div class="gs-point" id="pointN">-</div>
+          <div class="gs-diff" id="diffN">-</div>
+          <button class="gs-sendBtn" id="btnSendN" onclick="selectRecipient('N')">送る</button>
+        </div>
 
-    <!-- 西(相手) -->
-    <div class="pos west">
-      <div class="name" id="nameW">-</div>
-      <div class="point" id="pointW">-</div>
-      <div class="diff" id="diffW">-</div>
-      <button class="sendBtn" id="btnSendW" onclick="selectRecipient('W')">送る</button> <!-- 020 -->
-    </div>
+        <!-- 西(相手) -->
+        <div class="gs-seat gs-west">
+          <div class="gs-name" id="nameW">-</div>
+          <div class="gs-point" id="pointW">-</div>
+          <div class="gs-diff" id="diffW">-</div>
+          <button class="gs-sendBtn" id="btnSendW" onclick="selectRecipient('W')">送る</button>
+        </div>
 
-    <!-- 東(自分) -->
-    <div class="pos self">
-      <div class="selfName" id="myName">-</div>     <!-- 001 -->
-      <div class="selfPoint" id="myPoint">-</div>   <!-- 012 -->
-    </div>
+        <!-- 東(自分) -->
+        <div class="gs-seat gs-self">
+          <div class="gs-selfName" id="myName">-</div>
+          <div class="gs-selfPoint" id="myPoint">-</div>
+        </div>
 
-    <!-- 南(相手) -->
-    <div class="pos south">
-      <div class="name" id="nameS">-</div>
-      <div class="point" id="pointS">-</div>
-      <div class="diff" id="diffS">-</div>          <!-- 011 -->
-      <button class="sendBtn" id="btnSendS" onclick="selectRecipient('S')">送る</button> <!-- 021 -->
-    </div>
-  </div>
+        <!-- 南(相手) -->
+        <div class="gs-seat gs-south">
+          <div class="gs-name" id="nameS">-</div>
+          <div class="gs-point" id="pointS">-</div>
+          <div class="gs-diff" id="diffS">-</div>
+          <button class="gs-sendBtn" id="btnSendS" onclick="selectRecipient('S')">送る</button>
+        </div>
+      </div>
+    </section>
 
-  <!-- 送金UI -->
-  <div style="margin-top:14px; border-top:1px solid #ccc; padding-top:10px;">
-    <div>送り先：<span id="sendToName">-</span></div> <!-- 015 -->
-    <div>送る点数：<span id="sendAmount">0</span></div> <!-- 016 -->
+    <!-- =========================
+         右：操作パネル
+    ========================== -->
+    <aside class="gs-panel">
+      <!-- リーチ系 -->
+      <div class="gs-row">
+        <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
+        <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
+      </div>
 
-    <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-      <!-- 022-026 加算ボタン -->
-      <button class="amtBtn" onclick="addAmount(10000)">+10000</button> <!-- 026 -->
-      <button class="amtBtn" onclick="addAmount(5000)">+5000</button> <!-- 025 -->
-      <button class="amtBtn" onclick="addAmount(1000)">+1000</button>  <!-- 024 -->
-      <button class="amtBtn" onclick="addAmount(500)">+500</button>  <!-- 023 -->
-      <button class="amtBtn" onclick="addAmount(100)">+100</button>  <!-- 022 -->
-    </div>
-    <div style="margin-top:12px; display:flex; gap:10px;">
-      <button id="btnConfirm" onclick="confirmTransfer()">確定</button>      <!-- 018 -->
-      <button id="btnCancel" onclick="cancelTransfer()">取消</button>        <!-- 017 -->
-    </div>
-  </div>
+      <!-- 送金状況 -->
+      <div class="gs-card">
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">送り先：</div>
+          <div class="gs-cardValue"><span id="sendToName">-</span></div>
+        </div>
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">送る点数：</div>
+          <div class="gs-cardValue"><span id="sendAmount">0</span></div>
+        </div>
+      </div>
 
-  <div style="margin-top:12px; display:flex; gap:10px;">
-    <button id="btnEndGame" onclick="endGame()">対局終了</button> <!-- 027 -->
-    <button onclick="backToRoomList()">ルーム一覧へ戻る</button>
+      <!-- 加算ボタン -->
+      <div class="gs-amountGrid">
+        <button class="gs-btn" onclick="addAmount(10000)">10000</button>
+        <button class="gs-btn" onclick="addAmount(1000)">1000</button>
+        <button class="gs-btn" onclick="addAmount(100)">100</button>
+        <button class="gs-btn" onclick="addAmount(5000)">5000</button>
+        <button class="gs-btn" onclick="addAmount(500)">500</button>
+        <button class="gs-btn gs-btnSub" onclick="cancelTransfer()">クリア</button>
+      </div>
+
+      <!-- 確定/取消 -->
+      <div class="gs-row">
+        <button class="gs-btn gs-btnPrimary" id="btnConfirm" onclick="confirmTransfer()">確定</button>
+        <button class="gs-btn" id="btnCancel" onclick="cancelTransfer()">取消</button>
+      </div>
+
+      <!-- 対局終了 -->
+      <div class="gs-row">
+        <button class="gs-btn gs-btnDanger" id="btnEndGame" onclick="endGame()">対局終了</button>
+        <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
+      </div>
+    </aside>
   </div>
 </div>
+
 
 
 <script>
