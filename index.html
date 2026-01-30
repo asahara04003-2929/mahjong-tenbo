@@ -297,7 +297,6 @@ const roomList         = document.getElementById("roomList");
 const startBtn         = document.getElementById("startBtn");
 const seatArea         = document.getElementById("seatArea");
 const newPlayerName    = document.getElementById("newPlayerName");
-const debugPanel       = document.getElementById("debugPanel");
 
 
 const APP_STATE_KEY = "mahjong_app_state";
@@ -1540,7 +1539,6 @@ window.addEventListener("load", () => {
   currentRoomId = roomId;
 
   // まず全部隠す（重要）
-  debugPanel.classList.remove("hidden");
   loginScreen.classList.add("hidden");
   roomListScreen.classList.add("hidden");
   playerSetupScreen.classList.add("hidden");
