@@ -2,8 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
+<link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="style.css">
+
+<meta name="theme-color" content="#CFEEC0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -291,14 +297,7 @@ select { margin-left:6px; }
 // ================= Firebase =================
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyB3bo_jS_5LqCIRIM9oIQiAka1ImigMn9I",
-  authDomain: "mj-point-display.firebaseapp.com",
-  databaseURL: "https://mj-point-display-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "mj-point-display",
-  storageBucket: "mj-point-display.firebasestorage.app",
-  messagingSenderId: "971331131763",
-  appId: "1:971331131763:web:6949af1911ca4008304d06",
-  measurementId: "G-3Z8PP14QL4"
+
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -1542,8 +1541,18 @@ function saveAppState(screen) {
   }));
 }
 
-// 
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
+
+  // ===== PWA: Service Worker 登録（ここに追加）=====
+  if ("serviceWorker" in navigator) {
+    try {
+      await navigator.serviceWorker.register("/sw.js");
+      console.log("SW registered");
+    } catch (e) {
+      console.log("SW register failed:", e);
+    }
+  }
+
   const stateStr = sessionStorage.getItem(APP_STATE_KEY);
   if (!stateStr) return;
 
@@ -1564,27 +1573,26 @@ window.addEventListener("load", () => {
   loginScreen.classList.add("hidden");
   roomListScreen.classList.add("hidden");
   playerSetupScreen.classList.add("hidden");
-  // rejoinScreen.classList.add("hidden");
-  // gameScreen.classList.add("hidden");
+  gameScreen.classList.add("hidden");
 
   // ルーム一覧画面へ遷移
   if (screen === "roomList") {
     roomListScreen.classList.remove("hidden");
-    subscribeRooms();
+    enterRoom();
   }
 
   // 参加者設定画面へ遷移
   if (screen === "playerSetupScreen") {
-    enterRoom(roomId);
+    enterRoom();
   }
 
   // プレイヤー追加画面へ遷移
   if (screen === "addPlayerScreen") {
-    openAddPlayer();
+    enterRoom();
   }
 
-  if (screen === "gameStartScreen") {
-    // gameStart();
+  if (screen === "gameScreen") {
+    enterRoom();
   }
 });
 

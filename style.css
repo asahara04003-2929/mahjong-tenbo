@@ -33,8 +33,7 @@
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-areas:
     ". north ."
-    "west . south"
-    ". self .";
+    "west self south";
   gap:10px;
   justify-items:center;
   align-items:center;
@@ -42,7 +41,7 @@
 .pos{ background:#fff; border:1px solid #888; padding:8px 10px; border-radius:6px; min-width:140px; text-align:center; }
 .north{ grid-area:north; }
 .west{ grid-area:west; }
-.self{ grid-area:self; min-width:220px; padding:16px; }
+.self{ grid-area:self; min-width:140px; padding:16px; }
 .south{ grid-area:south; }
 
 .name,.selfName{ font-weight:bold; margin-bottom:4px; }
@@ -55,210 +54,239 @@
 .amtBtn{ min-width:80px; }
 
 
-/* =========================
-   Game Screen (対局画面)
-========================= */
+/* ===== 対局画面（横向きスマホ想定） ===== */
 
-#gameScreen {
-  /* 画像っぽい背景 */
-  background: #bfe6b0;
-  border: 2px solid #222;
-  padding: 14px;
-  max-width: 980px;
-  margin: 16px auto;
-  box-sizing: border-box;
+#gameScreen{
+  background:#bfe6b0;
+  border:2px solid #222;
+  padding:10px;
+  box-sizing:border-box;
+  max-width: 1100px;
+  margin: 10px auto;
 }
 
-.gs-title {
-  margin: 0 0 10px 0;
-  font-size: 18px;
+.gs-title{
+  margin:0;
+  font-size:18px;
 }
 
-.gs-layout {
-  display: grid;
+.gs-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+  position: relative;
+}
+
+.gs-headerRight{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.gs-label{
+  font-size:12px;
+  opacity:.85;
+}
+
+.gs-riichiBox{
+  position:absolute;
+  left:10px;
+  top:-6px;
+  background: transparent !important;
+  border:none !important;
+  font-weight:900;
+}
+
+.gs-riichiCount{
+  font-weight:800;
+  font-size:16px;
+}
+
+#btnRiichiAdd{
+  min-width:120px;
+}
+
+/* 横向き：左 卓 / 右 操作 */
+.gs-landscape{
+  display:grid;
   grid-template-columns: 1.2fr 0.8fr;
-  gap: 14px;
-  align-items: start;
+  gap:10px;
+  align-items:start;
 }
 
-/* ---- 左：卓 ---- */
-.gs-tableWrap {
-  position: relative;
-  min-height: 420px;
-}
-
-.gs-riichiLine {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.gs-riichiText {
-  font-size: 14px;
-}
-
-.gs-table {
-  position: relative;
+/* ===== 卓 ===== */
+.gs-tableWrap{
   min-height: 380px;
 }
 
-/* 座席の箱 */
-.gs-seat {
-  position: absolute;
-  background: #fff;
-  border: 2px solid #222;
-  padding: 8px 10px;
-  box-sizing: border-box;
-  text-align: center;
-  min-width: 120px;
+.gs-table{
+  position:relative;
+  height: 380px;
 }
 
-.gs-name {
-  font-weight: 700;
-  margin-bottom: 4px;
+/* 座席 */
+.gs-seat{
+  position:absolute;
+  background:#fff;
+  border:2px solid #222;
+  padding:8px 10px;
+  box-sizing:border-box;
+  text-align:center;
+  min-width: 135px;
 }
 
-.gs-point {
-  font-size: 18px;
-  line-height: 1.2;
+.gs-name{ font-weight:800; margin-bottom:4px; font-size:14px; }
+.gs-point{ font-size:18px; line-height:1.1; }
+.gs-diff{ font-size:12px; margin-top:4px; }
+
+/* JSが付ける negative に対応 */
+.negative{ color:#c00; }
+
+.gs-sendBtn{
+  margin-top:6px;
+  padding:10px 12px;
+  border:2px solid #222;
+  background:#fff;
+  font-weight:800;
+  cursor:pointer;
+  min-height:44px; /* スマホ基準 */
 }
 
-.gs-diff {
-  margin-top: 4px;
-  font-size: 13px;
-}
-
-/* あなたのJSが付ける negative クラスに対応 */
-.negative {
-  color: #c00;
-}
-
-/* 送るボタン */
-.gs-sendBtn {
-  margin-top: 6px;
-  padding: 6px 10px;
-  border: 2px solid #222;
-  background: #fff;
-  cursor: pointer;
-}
-
-/* 北・西・南・自分 の配置（画像の雰囲気に寄せる） */
-.gs-north {
-  top: 38px;
+/* 配置（画像に寄せる） */
+.gs-north{
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
-
-.gs-west {
-  top: 150px;
-  left: 10px;
+.gs-west{
+  top: 120px;
+  left: 30px !important;
 }
-
-.gs-south {
-  top: 150px;
-  right: 10px;
+.gs-south{
+  top: 120px;
+  right: 30px !important;
 }
-
-/* 自分（下の大きい枠） */
-.gs-self {
+.gs-self{
   left: 50%;
   bottom: 10px;
   transform: translateX(-50%);
-  width: 360px;
-  padding: 16px 10px;
+  width: px !important;
+  padding: 14px 10px;
+}
+.gs-selfName{ font-weight:900; margin-bottom:8px; }
+.gs-selfPoint{ font-size:42px; font-weight:900; letter-spacing:1px; }
+
+/* ===== 右：操作 ===== */
+.gs-panel{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
 }
 
-.gs-selfName {
-  font-weight: 700;
-  margin-bottom: 8px;
+.gs-card{
+  background:#fff;
+  border:2px solid #222;
+  padding:10px;
+  box-sizing:border-box;
 }
 
-.gs-selfPoint {
-  font-size: 40px;
-  line-height: 1.1;
-  letter-spacing: 1px;
+.gs-statusRow{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:4px 0;
 }
 
-/* ---- 右：操作パネル ---- */
-.gs-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.gs-statusLabel{
+  font-size:12px;
+  opacity:.85;
+  width:70px;
 }
 
-.gs-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+.gs-statusValue{
+  font-size:36px;
+  font-weight:900;
 }
 
-.gs-card {
-  background: #fff;
-  border: 2px solid #222;
-  padding: 10px;
-}
-
-.gs-cardRow {
-  display: flex;
-  gap: 6px;
-  margin: 4px 0;
-}
-
-.gs-cardLabel {
-  width: 78px;
-  font-size: 13px;
-  opacity: 0.85;
-}
-
-.gs-cardValue {
-  font-size: 14px;
-}
-
-.gs-amountGrid {
-  display: grid;
+/* 金額ボタン：大きめタイル */
+.gs-amountGrid{
+  display:grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap:10px;
 }
 
-/* ボタン共通 */
-.gs-btn {
-  background: #fff;
-  border: 2px solid #222;
-  padding: 10px 12px;
-  cursor: pointer;
-  font-weight: 700;
-  box-sizing: border-box;
+.gs-amtBtn{
+  border:2px solid #222;
+  background:#fff;
+  font-weight:900;
+  padding:14px 10px;
+  cursor:pointer;
+  min-height:56px;      /* 押しやすい */
+  font-size:16px;
 }
 
-.gs-btn:active,
-.gs-sendBtn:active {
-  transform: translateY(1px);
+.gs-amtSub{
+  opacity:.9;
 }
 
-.gs-btnWide {
-  min-width: 120px;
+/* 共通ボタン */
+.gs-btn{
+  border:2px solid #222;
+  background:#fff;
+  font-weight:900;
+  padding:12px 12px;
+  cursor:pointer;
+  min-height:44px;
 }
 
-.gs-btnSub {
-  opacity: 0.9;
+/* 確定を最重要に（サイズで目立たせる） */
+.gs-actionRow{
+  display:grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap:10px;
 }
 
-.gs-btnPrimary {
-  /* 色は控えめ（必要なら変えてOK） */
-  background: #fff;
+.gs-btnConfirm{
+  padding:16px 12px;
+  min-height:58px;
+  font-size:18px;
 }
 
-.gs-btnDanger {
-  background: #fff;
+.gs-btnCancel{
+  padding:16px 12px;
+  min-height:58px;
 }
 
-/* ---- レスポンシブ ---- */
-@media (max-width: 860px) {
-  .gs-layout {
-    grid-template-columns: 1fr;
+.gs-footerRow{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+}
+
+.gs-btnEnd{
+  min-height:52px;
+}
+
+/* ===== 小さい横幅（古いスマホ等）対策 ===== */
+@media (max-width: 760px){
+  .gs-landscape{
+    grid-template-columns: 1fr; /* どうしても狭いなら縦に落とす */
   }
-  .gs-tableWrap {
-    min-height: 390px;
+  .gs-table{
+    height: 420px;
   }
+}
+
+.gs-sendBtn.holding{
+  animation:pulse 1s linear infinite;
+}
+
+@keyframes pulse{
+  0%{background:#fff;}
+  50%{background:#ffe08a;}
+  100%{background:#fff;}
 }
