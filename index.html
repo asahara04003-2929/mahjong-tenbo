@@ -96,6 +96,115 @@ select { margin-left:6px; }
   <button onclick="backToRoomList()">一覧画面へ戻る</button>
 </div>
 
+
+<!-- ========================================= -->
+<!-- 対局画面 -->
+<!-- ========================================= -->
+<div id="gameScreen" class="hidden">
+  <h2 class="gs-title">対局中</h2>
+
+  <div class="gs-layout">
+    <!-- =========================
+         左：卓（点数表示）
+    ========================== -->
+    <section class="gs-tableWrap">
+
+
+      <div id="gameTable" class="gs-table">
+        <!-- 北(相手) -->
+        <div class="gs-riichiLine">
+          <div class="gs-riichiText">リーチ棒：<span id="riichiCount">0</span></div>
+        </div>
+        <div class="gs-seat gs-north">
+          <div class="gs-name" id="nameN">-</div>
+          <div class="gs-point" id="pointN">-</div>
+          <div class="gs-diff" id="diffN">-</div>
+        </div>
+
+        <!-- 西(相手) -->
+        <div class="gs-seat gs-west">
+          <div class="gs-name" id="nameW">-</div>
+          <div class="gs-point" id="pointW">-</div>
+          <div class="gs-diff" id="diffW">-</div>
+        </div>
+
+        <!-- 東(自分) -->
+        <div class="gs-seat gs-self">
+          <div class="gs-selfName" id="myName">-</div>
+          <div class="gs-selfPoint" id="myPoint">-</div>
+        </div>
+
+        <!-- 南(相手) -->
+        <div class="gs-seat gs-south">
+          <div class="gs-name" id="nameS">-</div>
+          <div class="gs-point" id="pointS">-</div>
+          <div class="gs-diff" id="diffS">-</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================
+         右：操作パネル
+    ========================== -->
+    <aside class="gs-panel">
+      <!-- リーチ系 -->
+      <div class="gs-row">
+        <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
+        <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
+      </div>
+      <div class="gs-row">
+      <!-- 対局終了 -->
+        <button class="gs-btn gs-btnDanger" id="btnEndGame" onclick="endGame()">対局終了</button>
+        <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+
+<!-- =========================
+     送金ボトムシート（下からせり出し）
+========================= -->
+<div id="transferOverlay" class="ts-overlay hidden" onclick="closeTransferSheet()"></div>
+
+<div id="transferSheet" class="ts-sheet hidden" role="dialog" aria-modal="true">
+  <div class="ts-handle"></div>
+
+  <div class="ts-header">
+    <div class="ts-title">送金</div>
+    <button class="ts-close" onclick="closeTransferSheet()">×</button>
+  </div>
+
+  <!-- 送金状況（元の赤枠の上部） -->
+  <div class="gs-card">
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">支払先：</div>
+      <div class="gs-cardValue"><span id="sendToName">-</span></div>
+    </div>
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">支払点数：</div>
+      <div class="gs-cardValue"><span id="sendAmount">0</span></div>
+    </div>
+  </div>
+
+  <!-- 加算ボタン -->
+  <div class="gs-amountGrid">
+    <button class="gs-btn" onclick="addAmount(10000)">10000</button>
+    <button class="gs-btn" onclick="addAmount(1000)">1000</button>
+    <button class="gs-btn" onclick="addAmount(100)">100</button>
+    <button class="gs-btn" onclick="addAmount(5000)">5000</button>
+    <button class="gs-btn" onclick="addAmount(500)">500</button>
+    <button class="gs-btn gs-btnSub" onclick="cancelTransfer()">クリア</button>
+  </div>
+
+  <!-- 確定/取消 -->
+  <div class="gs-row">
+    <button class="gs-btn gs-btnPrimary" id="btnConfirm" onclick="confirmTransfer()">確定</button>
+    <button class="gs-btn" id="btnCancel" onclick="cancelTransfer()">取消</button>
+  </div>
+</div>
+
+
 <!-- ========================================= -->
 <!-- 集計中画面 -->
 <!-- ========================================= -->
@@ -194,104 +303,6 @@ select { margin-left:6px; }
 </div>
 
 
-
-<!-- ========================================= -->
-<!-- 対局画面 -->
-<!-- ========================================= -->
-<div id="gameScreen" class="hidden">
-  <h2 class="gs-title">対局中</h2>
-
-  <div class="gs-layout">
-    <!-- =========================
-         左：卓（点数表示）
-    ========================== -->
-    <section class="gs-tableWrap">
-      <div class="gs-riichiLine">
-        <div class="gs-riichiText">リーチ棒：<span id="riichiCount">0</span></div>
-      </div>
-
-      <div id="gameTable" class="gs-table">
-        <!-- 北(相手) -->
-        <div class="gs-seat gs-north">
-          <div class="gs-name" id="nameN">-</div>
-          <div class="gs-point" id="pointN">-</div>
-          <div class="gs-diff" id="diffN">-</div>
-          <button class="gs-sendBtn" id="btnSendN" onclick="selectRecipient('N')">送る</button>
-        </div>
-
-        <!-- 西(相手) -->
-        <div class="gs-seat gs-west">
-          <div class="gs-name" id="nameW">-</div>
-          <div class="gs-point" id="pointW">-</div>
-          <div class="gs-diff" id="diffW">-</div>
-          <button class="gs-sendBtn" id="btnSendW" onclick="selectRecipient('W')">送る</button>
-        </div>
-
-        <!-- 東(自分) -->
-        <div class="gs-seat gs-self">
-          <div class="gs-selfName" id="myName">-</div>
-          <div class="gs-selfPoint" id="myPoint">-</div>
-        </div>
-
-        <!-- 南(相手) -->
-        <div class="gs-seat gs-south">
-          <div class="gs-name" id="nameS">-</div>
-          <div class="gs-point" id="pointS">-</div>
-          <div class="gs-diff" id="diffS">-</div>
-          <button class="gs-sendBtn" id="btnSendS" onclick="selectRecipient('S')">送る</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- =========================
-         右：操作パネル
-    ========================== -->
-    <aside class="gs-panel">
-      <!-- リーチ系 -->
-      <div class="gs-row">
-        <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
-        <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
-      </div>
-
-      <!-- 送金状況 -->
-      <div class="gs-card">
-        <div class="gs-cardRow">
-          <div class="gs-cardLabel">送り先：</div>
-          <div class="gs-cardValue"><span id="sendToName">-</span></div>
-        </div>
-        <div class="gs-cardRow">
-          <div class="gs-cardLabel">送る点数：</div>
-          <div class="gs-cardValue"><span id="sendAmount">0</span></div>
-        </div>
-      </div>
-
-      <!-- 加算ボタン -->
-      <div class="gs-amountGrid">
-        <button class="gs-btn" onclick="addAmount(10000)">10000</button>
-        <button class="gs-btn" onclick="addAmount(1000)">1000</button>
-        <button class="gs-btn" onclick="addAmount(100)">100</button>
-        <button class="gs-btn" onclick="addAmount(5000)">5000</button>
-        <button class="gs-btn" onclick="addAmount(500)">500</button>
-        <button class="gs-btn gs-btnSub" onclick="cancelTransfer()">クリア</button>
-      </div>
-
-      <!-- 確定/取消 -->
-      <div class="gs-row">
-        <button class="gs-btn gs-btnPrimary" id="btnConfirm" onclick="confirmTransfer()">確定</button>
-        <button class="gs-btn" id="btnCancel" onclick="cancelTransfer()">取消</button>
-      </div>
-
-      <!-- 対局終了 -->
-      <div class="gs-row">
-        <button class="gs-btn gs-btnDanger" id="btnEndGame" onclick="endGame()">対局終了</button>
-        <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
-      </div>
-    </aside>
-  </div>
-</div>
-
-
-
 <script>
 // ============================================
 //                  スクリプト
@@ -301,6 +312,8 @@ firebase.initializeApp(window.firebaseConfig);
 const db = firebase.database();
 
 // ===== DOM参照を明示（idの自動グローバルに依存しない）=====
+const transferSheet   = document.getElementById("transferSheet");
+const transferOverlay = document.getElementById("transferOverlay");
 const loginScreen      = document.getElementById("loginScreen");
 const roomListScreen   = document.getElementById("roomListScreen");
 const playerSetupScreen= document.getElementById("playerSetupScreen");
@@ -367,39 +380,6 @@ function loadRooms() {
     <div style="flex:1;">操作</div>
   `;
   roomList.appendChild(header);
-
-  // db.ref("rooms").once("value").then(snap => {
-  //   const rooms = snap.val() || {};
-  //   console.log("rooms:", rooms);
-
-  //   for (let id in rooms) {
-  //     const r = rooms[id];
-  //     const status = r.gameConfig?.status ?? "-";
-  //     if (!["waiting","playing","end","calculating"].includes(status)) continue;
-
-  //     const div = document.createElement("div");
-  //     div.style.display = "flex";
-  //     div.style.gap = "10px";
-  //     div.style.borderBottom = "1px solid #ccc";
-  //     div.style.padding = "4px 0";
-
-  //     const playerCount = r.players ? Object.keys(r.players).length : 0;
-
-  //     div.innerHTML = `
-  //       <div style="width:150px;">${id}</div>
-  //       <div style="width:100px;">${RULES[r.gameConfig.rule] || r.gameConfig.rule}</div>
-  //       <div style="width:100px;">${GAME_STATUS[r.gameConfig.status] || r.gameConfig.status}</div>
-  //       <div style="width:100px;">${playerCount}</div>
-  //       <div style="flex:1;">
-  //         ${r.gameConfig.status==="waiting" || r.gameConfig.status==="playing" ? `<button onclick="enterRoom('${id}')">入室</button>` : ""}
-  //         ${r.gameConfig.status==="calculating" ? `<button onclick="enterRoom('${id}')">集計</button>` : ""}
-  //         ${r.gameConfig.status==="end" ? `<button onclick="openEndScreen()">結果</button>` : ""}
-  //         ${r.gameConfig.status==="waiting" ? `<button onclick="deleteRoom('${id}')">削除</button>` : ""}
-  //       </div>
-  //     `;
-  //     roomList.appendChild(div);
-  //   }
-  // });
 }
 
 
@@ -956,6 +936,16 @@ function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
   const pointId = rel === "N" ? "pointN" : rel === "W" ? "pointW" : "pointS";
   const diffId  = rel === "N" ? "diffN"  : rel === "W" ? "diffW"  : "diffS";
 
+  // ★タップエリア（座席全体）を取得
+  const seatSel = rel === "N" ? ".gs-north" : rel === "W" ? ".gs-west" : ".gs-south";
+  const seatEl = document.querySelector(seatSel);
+
+  // まずクリック解除（毎回上書き）
+  if (seatEl) {
+    seatEl.onclick = null;
+    seatEl.classList.remove("tapTarget");
+  }
+
   if (!slot){
     setText(nameId, "-");
     setText(pointId, "-");
@@ -970,7 +960,15 @@ function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
   setText(nameId, nm);
   setText(pointId, pt);
   setDiff(diffId, myPoint - pt);
+
+  // ★座席全体タップで送り先選択 → ボトムシート表示
+  if (seatEl) {
+    seatEl.classList.add("tapTarget");
+    seatEl.onclick = () => selectRecipient(rel);
+  }
 }
+
+
 
 // ===============================
 // 013 リーチ：リーチ棒+1 / 自分point-1000
@@ -1024,6 +1022,7 @@ async function selectRecipient(rel){
   }
 
   setText("sendToName", targetPid ? (entryPlayers[targetPid]?.name ?? "不明") : "-");
+  openTransferSheet();
 }
 
 // ===============================
@@ -1043,7 +1042,9 @@ function cancelTransfer(){
   sendAmountValue = 0;
   setText("sendToName", "-");
   setText("sendAmount", "0");
+  closeTransferSheet();
 }
+
 
 // ===============================
 // 018 確定：自分→相手へ point 移動
@@ -1077,6 +1078,26 @@ async function confirmTransfer(){
 
   cancelTransfer();
 }
+
+
+// ボトムシートを開く
+function openTransferSheet(){
+  transferOverlay.classList.remove("hidden");
+  transferSheet.classList.remove("hidden");
+  // アニメ用クラスは次フレームで付ける（効く）
+  requestAnimationFrame(() => transferSheet.classList.add("is-open"));
+}
+
+// ボトムシートを閉じる
+function closeTransferSheet(){
+  transferSheet.classList.remove("is-open");
+  transferOverlay.classList.add("hidden");
+  // transition後にhiddenへ（雑でもOKならsetTimeout）
+  setTimeout(() => {
+    transferSheet.classList.add("hidden");
+  }, 230);
+}
+
 
 // ===============================
 // 対局終了ボタン
@@ -1528,6 +1549,17 @@ function backToRoomList() {
   if (statusUnsub) statusUnsub();
 }
 
+// 画面縦横調整用
+function applyOrientationClass(){
+  const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+  document.documentElement.classList.toggle("is-landscape", isLandscape);
+  document.documentElement.classList.toggle("is-portrait", !isLandscape);
+}
+
+window.addEventListener("load", applyOrientationClass);
+window.addEventListener("resize", applyOrientationClass);
+window.addEventListener("orientationchange", applyOrientationClass);
+
 
 // sessionStorageに必要な情報格納
 function saveAppState(screen) {
@@ -1572,27 +1604,43 @@ window.addEventListener("load", async () => {
   roomListScreen.classList.add("hidden");
   playerSetupScreen.classList.add("hidden");
   gameScreen.classList.add("hidden");
+  roomListScreen.classList.remove("hidden");
+  subscribeRooms();
 
-  // ルーム一覧画面へ遷移
-  if (screen === "roomList") {
-    roomListScreen.classList.remove("hidden");
-    enterRoom();
-  }
+  // // ルーム一覧画面へ遷移
+  // if (screen === "roomList") {
+  //   roomListScreen.classList.remove("hidden");
+  //   subscribeRooms();
+  // }
 
-  // 参加者設定画面へ遷移
-  if (screen === "playerSetupScreen") {
-    enterRoom();
-  }
+  // // 参加者設定画面へ遷移
+  // if (screen === "playerSetupScreen") {
+  //   subscribeRooms();
+  // }
 
-  // プレイヤー追加画面へ遷移
-  if (screen === "addPlayerScreen") {
-    enterRoom();
-  }
+  // // プレイヤー追加画面へ遷移
+  // if (screen === "addPlayerScreen") {
+  //   subscribeRooms();
+  // }
 
-  if (screen === "gameScreen") {
-    enterRoom();
-  }
+  // // 対局中
+  // if (screen === "gameScreen") {
+  //   subscribeRooms();
+  // }
 });
+
+function setRealVH(){
+  const vh = window.visualViewport
+    ? window.visualViewport.height * 0.01
+    : window.innerHeight * 0.01;
+
+  document.documentElement.style.setProperty("--vh", `${vh}px`);
+}
+
+setRealVH();
+
+window.addEventListener("resize", setRealVH);
+window.visualViewport?.addEventListener("resize", setRealVH);
 
 
 </script>
