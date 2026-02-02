@@ -1383,9 +1383,11 @@ function openGameScreen() {
     playersRef.off("value", handler);
     configRef.off("value", handler);
   };
-
+  // ★ここを追加（観戦は除外したいならガード）
+  if (!isSpectatorMode) subscribeTransferRequests();
   handler();
   subscribeRoomStatus();
+  
 }
 
 let statusUnsub = null;
@@ -1734,8 +1736,8 @@ function renderHistoryList(entryPlayers){
       </div>
 
       <div class="historyMeta">
-        <div>from: ${h.fromPlayerId === "pot" ? "場" : (h.fromBefore ?? "-")} → ${h.fromAfter ?? "-"}</div>
-        <div>to: ${h.toBefore ?? "-"} → ${h.toAfter ?? "-"}</div>
+        <div>${from}: ${h.fromPlayerId === "pot" ? "場" : (h.fromBefore ?? "-")} → ${h.fromAfter ?? "-"}</div>
+        <div>${to}: ${h.toBefore ?? "-"} → ${h.toAfter ?? "-"}</div>
       </div>
     `;
 
