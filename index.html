@@ -2154,12 +2154,13 @@ async function endGame() {
 
     const returnPoint = Number(gameConfig.returnPoint || 0);
 
+    // 参加者のみ：全員が returnPoint 未満か？
     const notReached = Object.values(players)
       .filter(p => p?.direction) // 参加者のみ
-      .some(p => Number(p.point || 0) < returnPoint);
+      .every(p => Number(p.point || 0) < returnPoint);
 
     if (notReached) {
-      alert(`どの対局者も${returnPoint}点に達していないため終了できません`);
+      alert(`誰も${returnPoint}点に達していないため終了できません`);
       return;
     }
 
