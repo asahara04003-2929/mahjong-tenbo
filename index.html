@@ -2736,7 +2736,7 @@ function setRealVH(){
 
   const isPortrait = vv ? (vv.height >= vv.width) : (window.innerHeight >= window.innerWidth);
 
-  const adjustedH = baseH - (isPortrait ? 60 : 0);
+  const adjustedH = baseH - (isPortrait ? 100 : 30);
   document.documentElement.style.setProperty("--vh", `${adjustedH * 0.01}px`);
 }
 

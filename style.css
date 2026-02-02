@@ -22,12 +22,12 @@
 @media (orientation: landscape) {
   body { padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
   /* 例：横はパネルを少し細くする */
-  .gs-panel { width: 320px; margin-top: 205px;}
+  .gs-panel { width: 320px; margin-top: 160px;}
   .gs-layout { gap: 8px; }
-  .gs-north{ top: 0px; }
-  .gs-west{ top: 50px; }
-  .gs-south{ top: 50px; }
-  .gs-self{ top: 150px; }
+  .gs-north{ top: -30px; }
+  .gs-west{ top: 20px; }
+  .gs-south{ top: 20px; }
+  .gs-self{ top: 100px; }
   /* .gs-tableWrap{
     min-height: calc(393px - env(safe-area-inset-left) - env(safe-area-inset-right));
   }
