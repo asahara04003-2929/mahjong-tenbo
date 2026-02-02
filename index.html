@@ -182,24 +182,24 @@ select { margin-left:6px; }
         </div>
       </div>
     </section>
+  </div>
 
-    <!-- =========================
-         右：操作パネル
-    ========================== -->
-      <aside class="gs-panel">
-        <!-- リーチ系 -->
-        <div class="gs-row">
-          <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
-          <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
-          <button class="gs-btn" id="btnHistory" onclick="openHistorySheet()">履歴</button>
-        </div>
-        <div class="gs-row">
-        <!-- 対局終了 -->
-          <button class="gs-btn gs-btnDanger" id="btnEndGame" onclick="endGame()">対局終了</button>
-          <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
-        </div>
-      </aside>
+  <!-- =========================
+        下：操作パネル
+  ========================== -->
+  <aside class="gs-panel">
+    <!-- リーチ系 -->
+    <div class="gs-row">
+      <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
+      <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
+      <button class="gs-btn" id="btnHistory" onclick="openHistorySheet()">履歴</button>
     </div>
+    <div class="gs-row">
+    <!-- 対局終了 -->
+      <button class="gs-btn gs-btnDanger" id="btnEndGame" onclick="endGame()">対局終了</button>
+      <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
+    </div>
+  </aside>
   <!-- リーチ棒表示（左上） -->
   <div id="riichiHUD" class="riichiHUD" aria-label="リーチ棒">
     <span class="riichiStick" aria-hidden="true"></span>

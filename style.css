@@ -22,12 +22,19 @@
 @media (orientation: landscape) {
   body { padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
   /* 例：横はパネルを少し細くする */
-  .gs-panel { width: 320px; }
+  .gs-panel { width: 320px; margin-top: 160px;}
   .gs-layout { gap: 8px; }
-  .gs-north{ top: 10px; }
-  .gs-west{ top: 70px; }
-  .gs-south{ top: 70px; }
-  .gs-self{ top: 140px; }
+  .gs-north{ top: 0%; }
+  .gs-west{ top: 50px; }
+  .gs-south{ top: 50px; }
+  .gs-self{ top: 120px; }
+  /* .gs-tableWrap{
+    min-height: calc(393px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
+  .gs-table{
+    height: calc(393px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  } */
 }
 
 .is-landscape .gs-panel { width: 320px; }
@@ -40,16 +47,6 @@ body{
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* 横向き時：卓の高さを iPhone縦幅(393px) に合わせる */
-@media (orientation: landscape) {
-  .gs-tableWrap{
-    min-height: calc(393px - env(safe-area-inset-left) - env(safe-area-inset-right));
-  }
-
-  .gs-table{
-    height: calc(393px - env(safe-area-inset-left) - env(safe-area-inset-right));
-  }
-}
 
 .hidden {
   display: none;
@@ -165,8 +162,6 @@ body{
 
 
 
-/* ===== 対局画面（横向きスマホ想定） ===== */
-
 #gameScreen{
   background:#bfe6b0;
   border:2px solid #222;
@@ -228,14 +223,10 @@ body{
   align-items:start;
 }
 
-/* ===== 卓 ===== */
-.gs-tableWrap{
-  min-height: 380px;
-}
+
 
 .gs-table{
   position:relative;
-  height: 380px;
 }
 
 /* 座席 */
