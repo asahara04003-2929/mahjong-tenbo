@@ -425,6 +425,7 @@ let currentGameInfo = {
   direction: null,
   status: null
 }
+let isSpectatorMode = false;
 
 // プルダウン用
 let entryPlayers = {};
@@ -748,7 +749,7 @@ function renderRoomList(rooms) {
       <div style="width:100px;">${playerCount}</div>
       <div style="flex:1;">
         ${["waiting","playing","calculating"].includes(status) ? `<button onclick="enterRoom('${id}')">入室</button>` : ""}
-        ${status === "end" ? `<button onclick="enterRoom('${id}'); openEndScreen();">結果</button>` : ""}
+        ${status === "end" ? `<button onclick="enterRoom('${id}')">結果</button>` : ""}
         ${status === "waiting" ? `<button onclick="deleteRoom('${id}')">削除</button>` : ""}
       </div>
     `;
@@ -925,40 +926,136 @@ function openAddPlayerFromRoomList() {
 }
 
 
-// 参加者設定処理
-function enterRoom(id) {
-  saveAppState("playerSetupScreen");
-  currentRoomId = id;
+// 参加者設定処理（入室）
+// deviceId -> myPlayerId を元に、自分のdirectionを確定して描画する
+async function enterRoom(id) {
+  try {
+    stopAllSubscriptions?.();
 
-  // ルール取得
-  db.ref(`rooms/${id}/gameConfig/rule`).once("value").then(s => {
-    currentRule = s.val();
+    currentRoomId = id;
 
-    // seats の初期化はここで1回だけ
-    seats = { 東:"", 南:"", 西:"", 北:"" };
+    if (!myPlayerId) {
+      await openPlayerConfigScreen("プレイヤー設定が未完了です。先にプレイヤー設定を行ってください。");
+      return;
+    }
 
-    // 画面切り替え
-    roomListScreen.classList.add("hidden");
-    playerSetupScreen.classList.remove("hidden");
+    const roomSnap = await db.ref(`rooms/${id}`).once("value");
+    if (!roomSnap.exists()) {
+      alert("ルームが存在しません。");
+      backToRoomList();
+      return;
+    }
 
-    // プレイヤー選択用データをロード
-    loadEntryPlayers();
+    const room = roomSnap.val() || {};
+    const gameConfig = room.gameConfig || {};
+    const players = room.players || {};
 
-    // リアルタイム監視
-    db.ref(`rooms/${currentRoomId}/players`).on("value", snap => {
-      const players = snap.val() || {};
+    currentRule = gameConfig.rule || null;
 
-      // DB に存在する方向だけを seats に反映（未選択は空のまま）
-      Object.keys(seats).forEach(dir => seats[dir] = ""); // 一度全席リセット
-      for (const [pid, p] of Object.entries(players)) {
-        if (p.direction) seats[p.direction] = pid;
+    const my = players[myPlayerId];
+
+    // ===== 観戦判定 =====
+    if (!my || !my.direction) {
+      // 観戦モード
+      isSpectatorMode = true;
+
+      currentGameInfo.playerId = null;     // 観戦は自分pid無し
+      currentGameInfo.direction = "東";    // 観戦の基準方角（相対変換用に使う場合の保険）
+      currentGameInfo.status = "spectating";
+
+      // 状態に応じて画面へ（観戦でも same）
+      const roomStatus = gameConfig.status || "waiting";
+
+      if (roomStatus === "calculating") {
+        openCalculatingScreen();
+        saveAppState("calculatingScreen");
+        return;
       }
 
-      renderSeats();
-      checkStart();
-    });
-  });
+      if (roomStatus === "end") {
+        openEndScreen();
+        saveAppState("endScreen");
+        return;
+      }
+
+      openGameScreen();
+      saveAppState("gameScreen");
+      return;
+    }
+
+    // ===== 通常参加 =====
+    isSpectatorMode = false;
+
+    currentGameInfo.playerId = myPlayerId;
+    currentGameInfo.direction = my.direction;
+    currentGameInfo.status = my.status || "waiting";
+
+    const roomStatus = gameConfig.status || "waiting";
+
+    saveAppState("enterRoom");
+
+    if (roomStatus === "calculating") {
+      openCalculatingScreen();
+      saveAppState("calculatingScreen");
+      return;
+    }
+
+    if (roomStatus === "end") {
+      openEndScreen();
+      saveAppState("endScreen");
+      return;
+    }
+
+    openGameScreen();
+    saveAppState("gameScreen");
+
+  } catch (e) {
+    console.error("enterRoom error:", e);
+    alert("入室処理でエラーが発生しました。コンソールを確認してください。\n" + (e?.message ?? e));
+    backToRoomList();
+  }
 }
+
+// 観戦時は操作を無効化
+function applySpectatorLockUI() {
+  const btnBack = Array.from(gameScreen.querySelectorAll("button"))
+    .find(b => (b.textContent || "").includes("ルーム一覧へ戻る"));
+
+  const disableIds = ["btnRiichiAdd", "btnRiichiTake", "btnEndGame", "btnConfirm", "btnCancel"];
+  for (const id of disableIds) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = true;
+  }
+
+  // 送金ボトムシートを開かせない（残ってたら閉じる）
+  try { closeTransferSheet(); } catch {}
+
+  // 観戦中はボトムシート自体触れないように（任意）
+  if (transferOverlay) transferOverlay.classList.add("hidden");
+  if (transferSheet) transferSheet.classList.add("hidden");
+
+  // 「戻る」以外のボタンも全部無効化（保険）
+  const allButtons = Array.from(gameScreen.querySelectorAll("button"));
+  for (const b of allButtons) {
+    if (btnBack && b === btnBack) continue;
+    // 戻る以外 disable
+    b.disabled = true;
+  }
+}
+
+function openGameScreen() {
+  // ...（既存そのまま）
+
+  handler();
+  subscribeRoomStatus();
+
+  // ★追加：観戦なら操作ロック
+  if (isSpectatorMode) {
+    applySpectatorLockUI();
+  }
+}
+
+
 
 // =======================
 // 参加者のプルダウン＆ラジオボタン描画
@@ -1291,6 +1388,12 @@ function subscribeRoomStatus() {
 // 画面描画（001〜012 など）
 // ===============================
 function renderGameUI(players, gameConfig, entryPlayers){
+  // ★観戦モード
+  if (isSpectatorMode) {
+    renderSpectatorUI(players, gameConfig, entryPlayers);
+    return;
+  }
+  
   const myPid = currentGameInfo.playerId;
   const my = players[myPid];
   if (!my) return; // まだDBにいない等
@@ -1356,7 +1459,14 @@ function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
   // ★座席全体タップで送り先選択 → ボトムシート表示
   if (seatEl) {
     seatEl.classList.add("tapTarget");
-    seatEl.onclick = () => selectRecipient(rel);
+
+    // ★観戦中は無効
+    if (isSpectatorMode) {
+      seatEl.onclick = null;
+      seatEl.classList.remove("tapTarget");
+    } else {
+      seatEl.onclick = () => selectRecipient(rel);
+    }
   }
 }
 
@@ -1513,6 +1623,69 @@ function closeTransferSheet(){
     transferSheet.classList.add("hidden");
   }, 230);
 }
+
+// 観戦描画関数
+function renderSpectatorUI(players, gameConfig, entryPlayers) {
+  // 上部：東、反時計回り：南、西、北
+  // 画面の4枠（上/左/中央/下）へ割り当て：
+  // 上(nameN/pointN) = 東
+  // 左(nameW/pointW) = 南
+  // 中央(myName/myPoint) = 西
+  // 下(nameS/pointS) = 北
+
+  const dirToPid = {};
+  for (const [pid, p] of Object.entries(players || {})) {
+    if (p?.direction) dirToPid[p.direction] = pid;
+  }
+
+  const nameOf = (pid) => pid ? (entryPlayers?.[pid]?.name ?? "不明") : "-";
+  const pointOf = (pid) => pid ? String(Number(players?.[pid]?.point ?? 0)) : "-";
+
+  const pidE = dirToPid["東"] || null;
+  const pidS = dirToPid["南"] || null;
+  const pidW = dirToPid["西"] || null;
+  const pidN = dirToPid["北"] || null;
+
+  // 上：東
+  setText("nameN", nameOf(pidE));
+  setText("pointN", pointOf(pidE));
+  setText("diffN", "-");
+
+  // 左：南
+  setText("nameW", nameOf(pidS));
+  setText("pointW", pointOf(pidS));
+  setText("diffW", "-");
+
+  // 中央：西（自分枠を流用）
+  setText("myName", nameOf(pidW));
+  setText("myPoint", pointOf(pidW));
+
+  // 下：北
+  setText("nameS", nameOf(pidN));
+  setText("pointS", pointOf(pidN));
+  setText("diffS", "-");
+
+  // リーチ棒
+  setText("riichiCount", Number(gameConfig?.riichiStickCount ?? 0));
+
+  // 観戦は席タップで送金などをさせない（毎回念押し）
+  const seatEls = [
+    document.querySelector(".gs-north"),
+    document.querySelector(".gs-west"),
+    document.querySelector(".gs-south")
+  ];
+  for (const el of seatEls) {
+    if (!el) continue;
+    el.onclick = null;
+    el.classList.remove("tapTarget");
+  }
+}
+
+
+
+
+
+
 
 
 // ===============================
