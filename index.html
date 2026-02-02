@@ -50,9 +50,6 @@ select { margin-left:6px; }
 
   <div style="height:24px;"></div>
 
-  <!-- 003: プレイヤー追加 -->
-  <button onclick="openAddPlayerFromPlayerConfig()">プレイヤー追加</button>
-
   <!-- 004: ルーム一覧へ戻る -->
   <div style="margin-top:12px;">
     <button onclick="goRoomList()">ルーム一覧へ戻る</button>
@@ -67,15 +64,65 @@ select { margin-left:6px; }
 <!-- ========================================= -->
 <div id="roomListScreen" class="hidden">
   <h2>ルーム一覧</h2>
-  <label for="integer">原点:</label>
-  <input type="number" id="startPoint" name="startPoint" step="5000" value=45000 placeholder="45000">
-  <label for="integer">返し点:</label>
-  <input type="number" id="returnPoint" name="returnPoint" step="5000" value=50000 placeholder="50000">
-  <label><input type="radio" name="rule" value="3" checked>3麻</label>
-  <label><input type="radio" name="rule" value="3r4">3麻4人回し</label>
-  <label><input type="radio" name="rule" value="4">4麻</label>
-  <button id="createRoomBtn" onclick="createRoom()">ルーム作成</button>
+  <!-- 上部ボタン（設計図：001,009） -->
+  <div style="display:flex; gap:10px; margin:10px 0;">
+    <button onclick="openRoomCreateScreen()">ルーム作成</button>  <!-- 001 -->
+    <button onclick="openPlayerConfigScreen()">プレイヤー設定</button>
+    <button onclick="openAddPlayerFromRoomList()">プレイヤー追加</button> <!-- 009 -->
+  </div>
   <div id="roomList"></div>
+</div>
+
+<!-- ========================================= -->
+<!-- ルーム作成（新規） -->
+<!-- ========================================= -->
+<div id="roomCreateScreen" class="hidden">
+  <h2>ルーム作成</h2>
+
+  <div style="margin:10px 0;">
+    <div style="margin-bottom:8px;">ルール：</div>
+    <label><input type="radio" name="create_rule" value="3" checked>3麻</label>
+    <label style="margin-left:10px;"><input type="radio" name="create_rule" value="3r4">3麻4人回し</label>
+    <label style="margin-left:10px;"><input type="radio" name="create_rule" value="4">4麻</label>
+  </div>
+
+  <div style="margin:10px 0;">
+    <label>原点：</label>
+    <input type="number" id="createStartPoint" step="5000" value="45000" style="width:120px;">
+  </div>
+
+  <div style="margin:10px 0;">
+    <label>返し点：</label>
+    <input type="number" id="createReturnPoint" step="5000" value="50000" style="width:120px;">
+  </div>
+
+  <div style="margin:14px 0;">
+    <div style="margin-bottom:8px;">席順</div>
+
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+      <div style="width:40px;">東：</div>
+      <select id="createSeatE"></select>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+      <div style="width:40px;">南：</div>
+      <select id="createSeatS"></select>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+      <div style="width:40px;">西：</div>
+      <select id="createSeatW"></select>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+      <div style="width:40px;">北：</div>
+      <select id="createSeatN"></select>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:10px; margin-top:14px;">
+    <button id="btnCreateRoomDo" onclick="createRoomFromCreateScreen()">ルーム作成</button> <!-- 008 -->
+    <button onclick="backToRoomList()">戻る</button>
+  </div>
+
+  <div id="roomCreateMsg" style="margin-top:10px; color:#b00;"></div>
 </div>
 
 <!-- ========================================= -->
@@ -348,6 +395,7 @@ const transferOverlay = document.getElementById("transferOverlay");
 const loginScreen      = document.getElementById("loginScreen");
 const playerConfigScreen = document.getElementById("playerConfigScreen");
 const roomListScreen   = document.getElementById("roomListScreen");
+const roomCreateScreen = document.getElementById("roomCreateScreen");
 const playerSetupScreen= document.getElementById("playerSetupScreen");
 const addPlayerScreen  = document.getElementById("addPlayerScreen");
 const playerSelectScreen = document.getElementById("playerSelectScreen");
@@ -390,6 +438,7 @@ function hideAllScreens() {
   loginScreen.classList.add("hidden");
   playerConfigScreen?.classList.add("hidden");
   roomListScreen.classList.add("hidden");
+  roomCreateScreen?.classList.add("hidden");
   playerSetupScreen.classList.add("hidden");
   addPlayerScreen.classList.add("hidden");
   playerSelectScreen.classList.add("hidden");
@@ -685,7 +734,9 @@ function renderRoomList(rooms) {
     div.style.borderBottom = "1px solid #ccc";
     div.style.padding = "4px 0";
 
-    const playerCount = r.players ? Object.keys(r.players).length : 0;
+    const playerCount = r.players
+      ? Object.values(r.players).filter(p => p?.status === "playing").length
+      : 0;
 
     const ruleText = RULES[r.gameConfig?.rule] || r.gameConfig?.rule || "-";
     const stText   = GAME_STATUS[status] || status;
@@ -714,60 +765,164 @@ function renderRoomList(rooms) {
 }
 
 
+// ---------------------------
+// ルーム作成画面（新規）
+// ---------------------------
+const createSeatIds = [
+  ["東", "createSeatE"],
+  ["南", "createSeatS"],
+  ["西", "createSeatW"],
+  ["北", "createSeatN"],
+];
 
-
-const startPointInput = document.getElementById("startPoint");
-const returnPointInput = document.getElementById("returnPoint");
-const createRoomBtn = document.getElementById("createRoomBtn");
-
-// ルーム作成ボタン活性/非活性制御　原点<=返し点のときは活性
-function validateRoomButton() {
-  const start = parseInt(startPointInput.value, 10) || 0;
-  const ret   = parseInt(returnPointInput.value, 10) || 0;
-
-  if (start <= ret) {
-    createRoomBtn.disabled = false;
-  } else {
-    createRoomBtn.disabled = true;
-  }
+function openRoomCreateScreen() {
+  showScreen("roomCreateScreen");
+  loadEntryPlayersForCreate();
 }
 
-// イベント登録
-startPointInput.addEventListener("input", validateRoomButton);
-returnPointInput.addEventListener("input", validateRoomButton);
+async function loadEntryPlayersForCreate() {
+  const msgEl = document.getElementById("roomCreateMsg");
+  if (msgEl) msgEl.textContent = "";
 
-// 初期チェック(ルーム作成ボタン活性/非活性制御)
-validateRoomButton();
+  const snap = await db.ref("systemConfig/entryPlayers").once("value");
+  const list = snap.val() || {};
 
+  // option生成（全席共通）
+  for (const [, selId] of createSeatIds) {
+    const sel = document.getElementById(selId);
+    if (!sel) continue;
 
+    sel.innerHTML = "";
 
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "未選択";
+    sel.appendChild(opt0);
 
-function createRoom() {
-  const rule = document.querySelector("input[name=rule]:checked")?.value;
-  const startPoint  = parseInt(document.querySelector("input[name=startPoint]")?.value)  || 45000;
-  const returnPoint = parseInt(document.querySelector("input[name=returnPoint]")?.value) || 50000;
-  if (!rule) return;
+    for (const [pid, p] of Object.entries(list)) {
+      const opt = document.createElement("option");
+      opt.value = pid;
+      opt.textContent = p?.name ?? pid;
+      sel.appendChild(opt);
+    }
 
+    sel.addEventListener("change", validateCreateRoomForm);
+  }
+
+  // ルール/点数も変更時に検証
+  document.querySelectorAll("input[name=create_rule]").forEach(r => {
+    r.addEventListener("change", validateCreateRoomForm);
+  });
+  document.getElementById("createStartPoint")?.addEventListener("input", validateCreateRoomForm);
+  document.getElementById("createReturnPoint")?.addEventListener("input", validateCreateRoomForm);
+
+  validateCreateRoomForm();
+}
+
+function getCreateRule() {
+  return document.querySelector("input[name=create_rule]:checked")?.value || "3";
+}
+
+function validateCreateRoomForm() {
+  const rule = getCreateRule();
+  const need = (rule === "3") ? 3 : 4;
+
+  const start = parseInt(document.getElementById("createStartPoint")?.value, 10) || 0;
+  const ret   = parseInt(document.getElementById("createReturnPoint")?.value, 10) || 0;
+
+  const picks = [];
+  for (const [dir, selId] of createSeatIds) {
+    const v = document.getElementById(selId)?.value || "";
+    if (v) picks.push({ dir, pid: v });
+  }
+
+  const msgEl = document.getElementById("roomCreateMsg");
+  const btn = document.getElementById("btnCreateRoomDo");
+
+  // 原点 <= 返し点
+  if (start > ret) {
+    if (msgEl) msgEl.textContent = "原点は返し点以下にしてください。";
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  // 重複チェック
+  const ids = picks.map(x => x.pid);
+  const unique = new Set(ids);
+  if (unique.size !== ids.length) {
+    if (msgEl) msgEl.textContent = "同じプレイヤーが複数席にいます。";
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  // 人数チェック
+  if (picks.length !== need) {
+    if (msgEl) msgEl.textContent = `席を${need}人分選択してください。`;
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  if (msgEl) msgEl.textContent = "";
+  if (btn) btn.disabled = false;
+}
+
+async function createRoomFromCreateScreen() {
+  validateCreateRoomForm();
+  const btn = document.getElementById("btnCreateRoomDo");
+  if (btn?.disabled) return;
+
+  const rule = getCreateRule();
+  const startPoint  = parseInt(document.getElementById("createStartPoint")?.value, 10) || 45000;
+  const returnPoint = parseInt(document.getElementById("createReturnPoint")?.value, 10) || 50000;
+
+  // 選択席を集める
+  const selected = [];
+  for (const [dir, selId] of createSeatIds) {
+    const pid = document.getElementById(selId)?.value || "";
+    if (pid) selected.push({ dir, pid });
+  }
+
+  const need = (rule === "3") ? 3 : 4;
+  if (selected.length !== need) return;
+
+  // ルームID（既存と同じ形式）
   const d = new Date();
   const pad = (n) => n.toString().padStart(2, "0");
-  const id = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-  db.ref("rooms/"+id).set({
-    gameConfig:{
+  const roomId = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+
+  // players を組み立て
+  const playersObj = {};
+  for (const x of selected) {
+    playersObj[x.pid] = {
+      direction: x.dir,
+      status: "waiting",
+      point: startPoint,
+      score: null,
+      yakitoriFlg: true
+    };
+  }
+
+  await db.ref(`rooms/${roomId}`).set({
+    gameConfig: {
       startPoint,
       returnPoint,
       rule,
-      status:"waiting",
+      status: "waiting",
       riichiStickCount: 0
     },
-    players:{},
-    transferRequests:{},
-    gameLogs:{}
-  }).then(() => {
-    // subscribeRooms の on("value") が勝手に更新するので不要
+    players: playersObj,
+    transferRequests: {},
+    gameLogs: {}
   });
+
+  // 作ったら一覧へ
+  backToRoomList();
 }
 
-
+function openAddPlayerFromRoomList() {
+  addPlayerReturnTo = "roomList";
+  showScreen("addPlayerScreen");
+}
 
 
 // 参加者設定処理
@@ -1781,9 +1936,7 @@ function stopAllSubscriptions() {
 // ------------------- DB削除 -------------------
 function deleteRoom(roomId) {
   if(!confirm("このルームを削除しますか？")) return;
-
-  // ルーム自体を削除（購読で一覧は自動更新）
-  db.ref(`rooms/${roomId}`).remove();
+  db.ref(`rooms/${roomId}/gameConfig/status`).set("delete");
 }
 
 
@@ -1791,19 +1944,50 @@ function deleteRoom(roomId) {
 // ================= 戻る =================
 function backToPlayerSetup() {
   addPlayerScreen.classList.add("hidden");
+
+  if (addPlayerReturnTo === "playerConfig") {
+    openPlayerConfigScreen("");
+    return;
+  }
+  if (addPlayerReturnTo === "roomList") {
+    showRoomListScreen();
+    return;
+  }
+
   playerSetupScreen.classList.remove("hidden");
   loadEntryPlayers();
 }
 
+
+// ルーム一覧画面への遷移
 function backToRoomList() {
-  hideAllScreens();
-  if (calcUnsub) calcUnsub();
-  saveAppState("roomList");
-  roomListScreen.classList.remove("hidden");
-  loadRooms();
-  subscribeRooms();
-  if (statusUnsub) statusUnsub();
+  try {
+    // 先に購読解除（画面切替前に安全に）
+    if (calcUnsub) { calcUnsub(); calcUnsub = null; }
+    if (statusUnsub) { statusUnsub(); statusUnsub = null; }
+    if (gameStateUnsub) { gameStateUnsub(); gameStateUnsub = null; }
+    if (endUnsub) { endUnsub(); endUnsub = null; }
+    if (roomsUnsub) { roomsUnsub(); roomsUnsub = null; }
+
+    hideAllScreens();
+
+    // ★保存するscreen名は実在するIDに合わせる
+    saveAppState("roomListScreen");
+
+    roomListScreen.classList.remove("hidden");
+
+    // 一覧描画
+    subscribeRooms(); // これで renderRoomList が走る
+  } catch (e) {
+    console.error("backToRoomList error:", e);
+
+    // ★最悪でも roomList は出す（真っ白回避）
+    hideAllScreens();
+    roomListScreen.classList.remove("hidden");
+    alert("画面遷移でエラー。コンソールの backToRoomList error を確認してください。");
+  }
 }
+
 
 // 画面縦横調整用
 function applyOrientationClass(){
