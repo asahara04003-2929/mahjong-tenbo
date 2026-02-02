@@ -2731,7 +2731,7 @@ window.addEventListener("load", async () => {
 
 
 function setRealVH(){
-  const vh = (window.visualViewport?.height ?? window.innerHeight) * 0.01;
+  const vh = (window.visualViewport?.height -30 ?? window.innerHeight - 30) * 0.01;
   document.documentElement.style.setProperty("--vh", `${vh}px`);
 }
 
