@@ -440,6 +440,11 @@ select { margin-left:6px; }
   </div>
 
   <div style="margin-top:18px; text-align:center;">
+    <!-- ★追加：履歴ボタン -->
+    <button id="btnEndHistory" onclick="openEndHistorySheet()">履歴</button>
+
+    <div style="height:10px;"></div>
+
     <button onclick="backToRoomList()">ルーム一覧へ戻る</button> <!-- 016 -->
   </div>
 </div>
@@ -2116,6 +2121,84 @@ function closeHistorySheet(){
   historyOverlay.classList.add("hidden");
   setTimeout(() => historySheet.classList.add("hidden"), 230);
 }
+
+// ===============================
+// 対局終了画面用：履歴（全件 / checkedAt 昇順）
+// ===============================
+async function loadHistoryAllOnceSortedByCheckedAtAsc(){
+  if (!currentRoomId) return;
+
+  const [tSnap, eSnap] = await Promise.all([
+    db.ref(`rooms/${currentRoomId}/transferRequests`).once("value"),
+    db.ref(`systemConfig/entryPlayers`).once("value")
+  ]);
+
+  const all = tSnap.val() || {};
+  const ep  = eSnap.val() || {};
+
+  historyCache = Object.entries(all)
+    .map(([id, v]) => ({ _id: id, ...(v || {}) }))
+    // checkedAt 昇順（null は最後に回す）
+    .sort((a,b) => {
+      const aa = (a.checkedAt === null || a.checkedAt === undefined) ? Infinity : Number(a.checkedAt);
+      const bb = (b.checkedAt === null || b.checkedAt === undefined) ? Infinity : Number(b.checkedAt);
+      if (aa !== bb) return aa - bb;
+
+      // 同じ checkedAt の場合は createdAt で安定化（任意）
+      const ac = Number(a.createdAt || 0);
+      const bc = Number(b.createdAt || 0);
+      return ac - bc;
+    });
+
+  renderHistoryList(ep);
+}
+
+async function openEndHistorySheet(){
+  historyOverlay.classList.remove("hidden");
+  historySheet.classList.remove("hidden");
+  requestAnimationFrame(() => historySheet.classList.add("is-open"));
+
+  // 対局終了画面は「全履歴」を checkedAt 昇順で表示
+  historyCache = [];
+  await loadHistoryAllOnceSortedByCheckedAtAsc();
+
+  // 対局終了後に履歴が増えるケースも拾いたいなら購読も可能（任意）
+  // subscribeHistoryAllByCheckedAtAsc();
+}
+
+// 任意：リアルタイムで追加分も反映したい場合
+function subscribeHistoryAllByCheckedAtAsc(){
+  if (!currentRoomId) return;
+  if (historyUnsub) historyUnsub();
+
+  const ref = db.ref(`rooms/${currentRoomId}/transferRequests`);
+
+  const handler = async (snap) => {
+    const obj = snap.val();
+    if (!obj) return;
+
+    const id = snap.key;
+    if (historyCache.some(x => x._id === id)) return;
+
+    historyCache.push({ _id: id, ...obj });
+    historyCache.sort((a,b) => {
+      const aa = (a.checkedAt === null || a.checkedAt === undefined) ? Infinity : Number(a.checkedAt);
+      const bb = (b.checkedAt === null || b.checkedAt === undefined) ? Infinity : Number(b.checkedAt);
+      if (aa !== bb) return aa - bb;
+      const ac = Number(a.createdAt || 0);
+      const bc = Number(b.createdAt || 0);
+      return ac - bc;
+    });
+
+    const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+    const ep = eSnap.val() || {};
+    renderHistoryList(ep);
+  };
+
+  ref.on("child_added", handler);
+  historyUnsub = () => ref.off("child_added", handler);
+}
+
 
 // 購読関数
 function subscribeTransferRequests(){
