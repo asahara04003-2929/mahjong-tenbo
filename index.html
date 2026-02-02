@@ -10,6 +10,7 @@
 
 <meta name="theme-color" content="#CFEEC0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
 
 <script src="firebaseConfig.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -31,6 +32,35 @@ select { margin-left:6px; }
   <input id="loginPass" placeholder="パスワード">
   <button onclick="login()">ログイン</button>
 </div>
+
+<!-- ========================================= -->
+<!-- プレイヤー設定（新規） -->
+<!-- ========================================= -->
+<div id="playerConfigScreen" class="hidden">
+  <h2>プレイヤー設定</h2>
+
+  <!-- 001: プルダウン -->
+  <div style="margin:12px 0;">
+    <label>プレイヤー：</label>
+    <select id="playerConfigSelect"></select>
+  </div>
+
+  <!-- 002: 設定完了 -->
+  <button id="btnPlayerConfigDone" onclick="completePlayerConfig()">設定完了</button>
+
+  <div style="height:24px;"></div>
+
+  <!-- 003: プレイヤー追加 -->
+  <button onclick="openAddPlayerFromPlayerConfig()">プレイヤー追加</button>
+
+  <!-- 004: ルーム一覧へ戻る -->
+  <div style="margin-top:12px;">
+    <button onclick="goRoomList()">ルーム一覧へ戻る</button>
+  </div>
+
+  <div id="playerConfigMsg" style="margin-top:10px; color:#b00;"></div>
+</div>
+
 
 <!-- ========================================= -->
 <!-- ルーム一覧 -->
@@ -102,7 +132,6 @@ select { margin-left:6px; }
 <!-- ========================================= -->
 <div id="gameScreen" class="hidden">
   <h2 class="gs-title">対局中</h2>
-
   <div class="gs-layout">
     <!-- =========================
          左：卓（点数表示）
@@ -112,9 +141,6 @@ select { margin-left:6px; }
 
       <div id="gameTable" class="gs-table">
         <!-- 北(相手) -->
-        <div class="gs-riichiLine">
-          <div class="gs-riichiText">リーチ棒：<span id="riichiCount">0</span></div>
-        </div>
         <div class="gs-seat gs-north">
           <div class="gs-name" id="nameN">-</div>
           <div class="gs-point" id="pointN">-</div>
@@ -158,6 +184,11 @@ select { margin-left:6px; }
         <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
       </div>
     </aside>
+  </div>
+  <!-- リーチ棒表示（左上） -->
+  <div id="riichiHUD" class="riichiHUD" aria-label="リーチ棒">
+    <span class="riichiStick" aria-hidden="true"></span>
+    <span class="riichiTimes">×<span id="riichiCount">0</span></span>
   </div>
 </div>
 
@@ -315,6 +346,7 @@ const db = firebase.database();
 const transferSheet   = document.getElementById("transferSheet");
 const transferOverlay = document.getElementById("transferOverlay");
 const loginScreen      = document.getElementById("loginScreen");
+const playerConfigScreen = document.getElementById("playerConfigScreen");
 const roomListScreen   = document.getElementById("roomListScreen");
 const playerSetupScreen= document.getElementById("playerSetupScreen");
 const addPlayerScreen  = document.getElementById("addPlayerScreen");
@@ -333,6 +365,10 @@ const newPlayerName    = document.getElementById("newPlayerName");
 
 const APP_STATE_KEY = "mahjong_app_state";
 
+// ============== 端末/プレイヤー紐づけ用（追加） ==============
+let myDeviceId = null;   // UUID
+let myPlayerId = null;   // deviceMapから逆引きしたplayerId
+
 // ================= 状態 =================
 let currentRoomId = null;
 let currentRule = null;
@@ -342,8 +378,6 @@ let currentGameInfo = {
   status: null
 }
 
-
-
 // プルダウン用
 let entryPlayers = {};
 let seats = { 東:"", 南:"", 西:"", 北:"" };
@@ -351,17 +385,220 @@ let seats = { 東:"", 南:"", 西:"", 北:"" };
 const RULES = {"3":"３麻", "3r4":"３麻４人回", "4":"4麻"};
 const GAME_STATUS = {"waiting": "待機中","playing": "対局中", "calculating": "集計中", "end":"対局終了"}
 
-// ================= ログイン =================
-function login() {
-  db.ref("systemConfig/loginPass").once("value").then(s => {
-    if (s.val() === loginPass.value) {
-      loginScreen.classList.add("hidden");
-      roomListScreen.classList.remove("hidden");
-      saveAppState("roomList");
-      subscribeRooms();
-    }
-  });
+// 全画面非表示
+function hideAllScreens() {
+  loginScreen.classList.add("hidden");
+  playerConfigScreen?.classList.add("hidden");
+  roomListScreen.classList.add("hidden");
+  playerSetupScreen.classList.add("hidden");
+  addPlayerScreen.classList.add("hidden");
+  playerSelectScreen.classList.add("hidden");
+  gameScreen.classList.add("hidden");
+  calculatingScreen.classList.add("hidden");
+  endScreen.classList.add("hidden");
+
+  // ★追加
+  document.getElementById("playerConfigScreen")?.classList.add("hidden");
 }
+
+// 画面表示
+function showScreen(id) {
+  hideAllScreens();
+  document.getElementById(id)?.classList.remove("hidden");
+  saveAppState(id); // 画面IDをそのまま保存してOK（後で復帰）
+}
+
+// ================= ログイン =================
+async function login() {
+  const pass = (loginPass?.value ?? "").trim();
+
+  if (!pass) {
+    alert("パスワードを入力してください");
+    return;
+  }
+
+  try {
+    const snap = await db.ref("systemConfig/loginPass").once("value");
+
+    if (!snap.exists()) {
+      alert("DBに systemConfig/loginPass が存在しません。パスを確認してください。");
+      return;
+    }
+
+    const dbPass = String(snap.val() ?? "").trim();
+
+    // ★型違い（数値/文字列）でも一致できるように String 比較
+    if (dbPass !== String(pass)) {
+      alert("パスワードが違います。");
+      return;
+    }
+
+    // 成功
+    await bootstrapAfterLogin();
+
+  } catch (e) {
+    console.error("login error:", e);
+    alert("Firebase読み取りに失敗しました。コンソールの login error を見てください。\n" + (e?.message ?? e));
+  }
+}
+
+
+async function bootstrapAfterLogin() {
+  loginScreen.classList.add("hidden");
+  // 1) deviceId取得
+  myDeviceId = getOrCreateDeviceId();
+  if (!myDeviceId) {
+    // まずここはほぼ起きないが念のため
+    myPlayerId = null;
+    await openPlayerConfigScreen("deviceIdが取得できません。再読み込みしてください。");
+    return;
+  }
+
+  // 2) deviceMap/{deviceId} を参照
+  const snap = await db.ref(`deviceMap/${myDeviceId}`).once("value");
+  const map = snap.val();
+
+  // 3) playerId取れればルーム一覧へ、取れなければプレイヤー設定へ
+  if (map && map.playerId) {
+    myPlayerId = map.playerId;
+    showRoomListScreen();
+    return;
+  }
+
+  myPlayerId = null;
+  await openPlayerConfigScreen("");
+}
+
+const DEVICE_ID_KEY = "mahjong_device_id";
+
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (id) return id;
+
+  // crypto.randomUUID が使えるならそれを使う
+  if (crypto?.randomUUID) {
+    id = crypto.randomUUID();
+  } else {
+    // フォールバック（十分ユニーク）
+    id = "xxxxxxxxyxxx4xxxyxxxxyxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  localStorage.setItem(DEVICE_ID_KEY, id);
+  return id;
+}
+
+async function openPlayerConfigScreen(msg) {
+  showScreen("playerConfigScreen");
+
+  const msgEl = document.getElementById("playerConfigMsg");
+  if (msgEl) msgEl.textContent = msg || "";
+
+  // entryPlayersをロードしてプルダウン作る
+  const snap = await db.ref("systemConfig/entryPlayers").once("value");
+  const list = snap.val() || {};
+
+  const sel = document.getElementById("playerConfigSelect");
+  sel.innerHTML = "";
+
+  // 1件も無い場合
+  const keys = Object.keys(list);
+  if (keys.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "プレイヤーが未登録です";
+    sel.appendChild(opt);
+    document.getElementById("btnPlayerConfigDone").disabled = true;
+    return;
+  }
+
+  document.getElementById("btnPlayerConfigDone").disabled = false;
+
+  // option作成
+  for (const pid of keys) {
+    const opt = document.createElement("option");
+    opt.value = pid;
+    opt.textContent = list[pid]?.name ?? pid;
+    sel.appendChild(opt);
+  }
+}
+
+async function completePlayerConfig() {
+  const sel = document.getElementById("playerConfigSelect");
+  const pid = sel?.value;
+
+  if (!pid) {
+    document.getElementById("playerConfigMsg").textContent = "プレイヤーを選択してください。";
+    return;
+  }
+
+  // deviceIdが無ければ作る（基本ここには来ない）
+  myDeviceId = myDeviceId || getOrCreateDeviceId();
+  if (!myDeviceId) {
+    document.getElementById("playerConfigMsg").textContent = "deviceIdを取得できません。";
+    return;
+  }
+
+  const ref = db.ref(`deviceMap/${myDeviceId}`);
+  const snap = await ref.once("value");
+  const cur = snap.val();
+
+  if (cur && cur.playerId) {
+    // ★すでに紐づけ済みなら更新不要（仕様）
+    myPlayerId = cur.playerId;
+  } else {
+    // 新規作成
+    await ref.set({
+      playerId: pid,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      lastRoomId: null
+    });
+    myPlayerId = pid;
+  }
+
+  // ルーム一覧へ
+  showRoomListScreen();
+}
+
+let addPlayerReturnTo = null; // "playerConfig" or "playerSetup"
+
+function openAddPlayerFromPlayerConfig() {
+  addPlayerReturnTo = "playerConfig";
+  showScreen("addPlayerScreen");
+}
+
+function openAddPlayer() {
+  // 既存の参加者設定画面から呼ぶ場合
+  addPlayerReturnTo = "playerSetup";
+  playerSetupScreen.classList.add("hidden");
+  addPlayerScreen.classList.remove("hidden");
+  saveAppState("addPlayerScreen");
+}
+
+function backToPlayerSetup() {
+  addPlayerScreen.classList.add("hidden");
+
+  if (addPlayerReturnTo === "playerConfig") {
+    openPlayerConfigScreen("");
+    return;
+  }
+
+  playerSetupScreen.classList.remove("hidden");
+  loadEntryPlayers();
+}
+
+function showRoomListScreen() {
+  showScreen("roomListScreen");
+  subscribeRooms();
+}
+function goRoomList() {
+  // プレイヤー設定から戻るボタン用
+  showRoomListScreen();
+}
+
 
 // ================= ルーム一覧 =================
 function loadRooms() {
@@ -1079,6 +1316,30 @@ async function confirmTransfer(){
   cancelTransfer();
 }
 
+// リーチ棒表示
+function renderRiichiSticks(count){
+  const wrap = document.getElementById("riichiSticks");
+  const num  = document.getElementById("riichiCount");
+  if (!wrap || !num) return;
+
+  const c = Number(count || 0);
+
+  wrap.innerHTML = "";
+
+  if (c <= 0){
+    num.textContent = "0";
+    return;
+  }
+
+  // 棒は常に1本だけ
+  const d = document.createElement("div");
+  d.className = "stick";
+  wrap.appendChild(d);
+
+  // ×N 表示
+  num.textContent = `×${c}`;
+}
+
 
 // ボトムシートを開く
 function openTransferSheet(){
@@ -1327,7 +1588,7 @@ function setYakitoriButton(btnId, pid, players) {
   if (!pid || !players[pid]) { btn.textContent = "-"; btn.disabled = true; return; }
 
   const flg = players[pid].yakitoriFlg === true;
-  btn.textContent = flg ? "ヤキトリ" : ""; // 仕様どおり
+  btn.textContent = flg ? "ヤキトリ" : "　　　　"; // 仕様どおり
   btn.disabled = false;
 }
 
@@ -1535,14 +1796,9 @@ function backToPlayerSetup() {
 }
 
 function backToRoomList() {
+  hideAllScreens();
   if (calcUnsub) calcUnsub();
   saveAppState("roomList");
-  // rejoinScreen.classList.add("hidden");
-  playerSetupScreen.classList.add("hidden");
-  gameScreen.classList.add("hidden");
-  playerSelectScreen.classList.add("hidden");
-  calculatingScreen.classList.add("hidden");
-  endScreen.classList.add("hidden");
   roomListScreen.classList.remove("hidden");
   loadRooms();
   subscribeRooms();
@@ -1567,13 +1823,15 @@ function saveAppState(screen) {
     loggedIn: true,
     screen,
     roomId: currentRoomId ?? null,
-    currentGameInfo: currentGameInfo ?? {}
+    currentGameInfo: currentGameInfo ?? {},
+    myDeviceId: myDeviceId ?? null,
+    myPlayerId: myPlayerId ?? null
   }));
 }
 
 window.addEventListener("load", async () => {
 
-  // ===== PWA: Service Worker 登録（ここに追加）=====
+  // Service Worker 登録（そのまま）
   if ("serviceWorker" in navigator) {
     try {
       await navigator.serviceWorker.register("/sw.js");
@@ -1587,47 +1845,18 @@ window.addEventListener("load", async () => {
   if (!stateStr) return;
 
   let state;
-  try {
-    state = JSON.parse(stateStr);
-  } catch {
+  try { state = JSON.parse(stateStr); }
+  catch {
     sessionStorage.removeItem(APP_STATE_KEY);
     return;
   }
 
   if (!state.loggedIn) return;
 
-  const { screen, roomId } = state;
-  currentRoomId = roomId;
-
-  // まず全部隠す（重要）
-  loginScreen.classList.add("hidden");
-  roomListScreen.classList.add("hidden");
-  playerSetupScreen.classList.add("hidden");
-  gameScreen.classList.add("hidden");
-  roomListScreen.classList.remove("hidden");
-  subscribeRooms();
-
-  // // ルーム一覧画面へ遷移
-  // if (screen === "roomList") {
-  //   roomListScreen.classList.remove("hidden");
-  //   subscribeRooms();
-  // }
-
-  // // 参加者設定画面へ遷移
-  // if (screen === "playerSetupScreen") {
-  //   subscribeRooms();
-  // }
-
-  // // プレイヤー追加画面へ遷移
-  // if (screen === "addPlayerScreen") {
-  //   subscribeRooms();
-  // }
-
-  // // 対局中
-  // if (screen === "gameScreen") {
-  //   subscribeRooms();
-  // }
+  // ★ログイン済みなら、deviceMap判定へ
+  await bootstrapAfterLogin();
 });
+
 
 function setRealVH(){
   const vh = window.visualViewport

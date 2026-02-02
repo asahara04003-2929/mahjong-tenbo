@@ -3,7 +3,6 @@ const ASSETS = [
   "/",
   "/index.html",
   "/style.css",
-  "/app.js",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png"
@@ -11,10 +10,24 @@ const ASSETS = [
 
 // インストール時に静的ファイルをキャッシュ
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+
+    // addAll だと1個失敗で全部失敗するので、1件ずつtryする
+    await Promise.all(
+      ASSETS.map(async (url) => {
+        try {
+          await cache.add(url);
+        } catch (e) {
+          console.warn("[SW] skip cache:", url, e);
+        }
+      })
+    );
+
+    self.skipWaiting();
+  })());
 });
+
 
 // 古いキャッシュ削除
 self.addEventListener("activate", (event) => {
