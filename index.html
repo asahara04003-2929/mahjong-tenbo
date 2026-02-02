@@ -138,33 +138,6 @@ select { margin-left:6px; }
   <button onclick="backToPlayerSetup()">戻る</button>
 </div>
 
-<!-- ========================================= -->
-<!-- プレイヤー選択画面 -->
-<!-- ========================================= -->
-<div id="playerSelectScreen" class="hidden">
-  <h2>自席を選択してください。</h2>
-
-  <div id="playerSelectTable" style="display: grid; grid-template-columns: 1fr 1fr 1fr; text-align: center; row-gap: 10px; column-gap: 10px; justify-items: center;">
-    <!-- 東 -->
-    <div></div>
-    <div id="player-east"></div>
-    <div></div>
-
-    <!-- 南/北 -->
-    <div id="player-south"></div>
-    <div></div>
-    <div id="player-north"></div>
-
-    <!-- 西 -->
-    <div></div>
-    <div id="player-west"></div>
-    <div></div>
-  </div>
-
-  <br>
-  <button onclick="backToRoomList()">一覧画面へ戻る</button>
-</div>
-
 
 <!-- ========================================= -->
 <!-- 対局画面 -->
@@ -213,20 +186,20 @@ select { margin-left:6px; }
     <!-- =========================
          右：操作パネル
     ========================== -->
-    <aside class="gs-panel">
-      <!-- リーチ系 -->
-      <div class="gs-row">
-        <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
-        <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
-        <button class="gs-btn" id="btnHistory" onclick="openHistorySheet()">履歴</button>
-      </div>
-      <div class="gs-row">
-      <!-- 対局終了 -->
-        <button class="gs-btn gs-btnDanger" id="btnEndGame" onclick="endGame()">対局終了</button>
-        <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
-      </div>
-    </aside>
-  </div>
+      <aside class="gs-panel">
+        <!-- リーチ系 -->
+        <div class="gs-row">
+          <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
+          <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
+          <button class="gs-btn" id="btnHistory" onclick="openHistorySheet()">履歴</button>
+        </div>
+        <div class="gs-row">
+        <!-- 対局終了 -->
+          <button class="gs-btn gs-btnDanger" id="btnEndGame" onclick="endGame()">対局終了</button>
+          <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
+        </div>
+      </aside>
+    </div>
   <!-- リーチ棒表示（左上） -->
   <div id="riichiHUD" class="riichiHUD" aria-label="リーチ棒">
     <span class="riichiStick" aria-hidden="true"></span>
@@ -470,7 +443,6 @@ const playerConfigScreen = document.getElementById("playerConfigScreen");
 const roomListScreen   = document.getElementById("roomListScreen");
 const roomCreateScreen = document.getElementById("roomCreateScreen");
 const addPlayerScreen  = document.getElementById("addPlayerScreen");
-const playerSelectScreen = document.getElementById("playerSelectScreen");
 const gameScreen       = document.getElementById("gameScreen");
 const calculatingScreen= document.getElementById("calculatingScreen");
 const endScreen        = document.getElementById("endScreen");
@@ -514,7 +486,6 @@ function hideAllScreens() {
   roomListScreen.classList.add("hidden");
   roomCreateScreen?.classList.add("hidden");
   addPlayerScreen.classList.add("hidden");
-  playerSelectScreen.classList.add("hidden");
   gameScreen.classList.add("hidden");
   calculatingScreen.classList.add("hidden");
   endScreen.classList.add("hidden");
@@ -1257,75 +1228,6 @@ function addPlayer() {
 
 
 // ===============================
-// プレイヤー選択用ボタン描画
-// ===============================
-async function renderPlayerSelect() {
-  if (!currentRoomId) return;
-  playerSelectScreen.classList.remove("hidden");
-  saveAppState("playerSelectScreen");
-
-  const [playersSnap, entrySnap] = await Promise.all([
-    db.ref(`rooms/${currentRoomId}/players`).once("value"),
-    db.ref(`systemConfig/entryPlayers`).once("value")
-  ]);
-
-  const players = playersSnap.val() || {};
-  const entryPlayers = entrySnap.val() || {};
-  const directions = { 北:"player-north", 東:"player-east", 南:"player-south", 西:"player-west" };
-
-  // direction -> playerId を1回で作る
-  const dirToPid = {};
-  for (const [pid, p] of Object.entries(players)) {
-    if (p?.direction) dirToPid[p.direction] = pid;
-  }
-
-  for (const [dir, divId] of Object.entries(directions)) {
-    const container = document.getElementById(divId);
-    if (!container) continue;
-
-    container.innerHTML = "";
-
-    const playerId = dirToPid[dir];
-    if (!playerId) {
-      container.textContent = "未割当";
-      continue;
-    }
-
-    const name = entryPlayers[playerId]?.name ?? "不明";
-
-    const btn = document.createElement("button");
-    btn.textContent = name;
-
-    btn.onclick = () => selectPlayer(playerId, dir);
-    container.appendChild(btn);
-  }
-}
-
-
-// ===============================
-// ボタン選択時の処理
-// ===============================
-async function selectPlayer(playerId, direction) {
-  currentGameInfo.playerId = playerId;
-  currentGameInfo.direction = direction;
-  currentGameInfo.status = "playing";
-
-  // 自分を playing に
-  await db.ref(`rooms/${currentRoomId}/players/${playerId}/status`).set("playing");
-
-  // ★ルーム状態を waiting → playing に（多重更新防止）
-  const roomStatusRef = db.ref(`rooms/${currentRoomId}/gameConfig/status`);
-  await roomStatusRef.transaction(cur => {
-    if (cur === "waiting") return "playing";
-    return; // それ以外は変更なし
-  });
-
-  openGameScreen();
-}
-
-
-
-// ===============================
 // 対局中 画面用（一時状態）
 // ===============================
 let gameStateUnsub = null;
@@ -1361,13 +1263,12 @@ function setDiff(elId, diff){
 }
 
 // ===============================
-// 対局画面を開く（呼び出し元は selectPlayer() など）
+// 対局画面を開く
 // ===============================
 function openGameScreen() {
   loginScreen?.classList.add("hidden");
   roomListScreen?.classList.add("hidden");
   addPlayerScreen?.classList.add("hidden");
-  playerSelectScreen?.classList.add("hidden"); // ←戻す
   gameScreen.classList.remove("hidden");
   historyCache = [];
   if (historyUnsub) { historyUnsub(); historyUnsub = null; }
@@ -2321,7 +2222,6 @@ function openCalculatingScreen() {
   loginScreen?.classList.add("hidden");
   roomListScreen?.classList.add("hidden");
   addPlayerScreen?.classList.add("hidden");
-  playerSelectScreen?.classList.add("hidden");
   gameScreen?.classList.add("hidden");
   calculatingScreen.classList.remove("hidden");
 
@@ -2605,7 +2505,6 @@ function openEndScreen() {
   loginScreen?.classList.add("hidden");
   roomListScreen?.classList.add("hidden");
   addPlayerScreen?.classList.add("hidden");
-  playerSelectScreen?.classList.add("hidden");
   gameScreen?.classList.add("hidden");
   calculatingScreen?.classList.add("hidden");
   endScreen.classList.remove("hidden");
