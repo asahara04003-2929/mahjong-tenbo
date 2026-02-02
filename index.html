@@ -64,6 +64,8 @@ select { margin-left:6px; }
 <!-- ========================================= -->
 <div id="roomListScreen" class="hidden">
   <h2>ルーム一覧</h2>
+  <!-- ★追加：自分の名前表示 -->
+  <div id="myPlayerLabel" style="font-weight:700;"></div>
   <!-- 上部ボタン（設計図：001,009） -->
   <div style="display:flex; gap:10px; margin:10px 0;">
     <button onclick="openRoomCreateScreen()">ルーム作成</button>  <!-- 001 -->
@@ -125,16 +127,6 @@ select { margin-left:6px; }
   <div id="roomCreateMsg" style="margin-top:10px; color:#b00;"></div>
 </div>
 
-<!-- ========================================= -->
-<!-- 参加者設定 -->
-<!-- ========================================= -->
-<div id="playerSetupScreen" class="hidden">
-  <h2>参加者設定</h2>
-  <div id="seatArea"></div>
-  <button onclick="openAddPlayer()">プレイヤー追加</button>
-  <button onclick="backToRoomList()">戻る</button>
-  <button id="startBtn" disabled onclick="renderPlayerSelect()">対局開始</button>
-</div>
 
 <!-- ========================================= -->
 <!-- プレイヤー追加 -->
@@ -396,20 +388,14 @@ const loginScreen      = document.getElementById("loginScreen");
 const playerConfigScreen = document.getElementById("playerConfigScreen");
 const roomListScreen   = document.getElementById("roomListScreen");
 const roomCreateScreen = document.getElementById("roomCreateScreen");
-const playerSetupScreen= document.getElementById("playerSetupScreen");
 const addPlayerScreen  = document.getElementById("addPlayerScreen");
 const playerSelectScreen = document.getElementById("playerSelectScreen");
 const gameScreen       = document.getElementById("gameScreen");
 const calculatingScreen= document.getElementById("calculatingScreen");
 const endScreen        = document.getElementById("endScreen");
-
 const loginPass        = document.getElementById("loginPass");
 const roomList         = document.getElementById("roomList");
-
-const startBtn         = document.getElementById("startBtn");
-const seatArea         = document.getElementById("seatArea");
 const newPlayerName    = document.getElementById("newPlayerName");
-
 
 const APP_STATE_KEY = "mahjong_app_state";
 
@@ -429,9 +415,8 @@ let isSpectatorMode = false;
 
 // プルダウン用
 let entryPlayers = {};
-let seats = { 東:"", 南:"", 西:"", 北:"" };
 
-const RULES = {"3":"３麻", "3r4":"３麻４人回", "4":"4麻"};
+const RULES = {"3":"３麻", "3r4":"３麻４人回", "4":"４麻"};
 const GAME_STATUS = {"waiting": "待機中","playing": "対局中", "calculating": "集計中", "end":"対局終了"}
 
 // 全画面非表示
@@ -440,7 +425,6 @@ function hideAllScreens() {
   playerConfigScreen?.classList.add("hidden");
   roomListScreen.classList.add("hidden");
   roomCreateScreen?.classList.add("hidden");
-  playerSetupScreen.classList.add("hidden");
   addPlayerScreen.classList.add("hidden");
   playerSelectScreen.classList.add("hidden");
   gameScreen.classList.add("hidden");
@@ -585,7 +569,6 @@ async function completePlayerConfig() {
     return;
   }
 
-  // deviceIdが無ければ作る（基本ここには来ない）
   myDeviceId = myDeviceId || getOrCreateDeviceId();
   if (!myDeviceId) {
     document.getElementById("playerConfigMsg").textContent = "deviceIdを取得できません。";
@@ -593,25 +576,24 @@ async function completePlayerConfig() {
   }
 
   const ref = db.ref(`deviceMap/${myDeviceId}`);
-  const snap = await ref.once("value");
-  const cur = snap.val();
 
-  if (cur && cur.playerId) {
-    // ★すでに紐づけ済みなら更新不要（仕様）
-    myPlayerId = cur.playerId;
-  } else {
-    // 新規作成
-    await ref.set({
-      playerId: pid,
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      lastRoomId: null
-    });
-    myPlayerId = pid;
-  }
+  // ★常に上書き更新する（変更を許可）
+  await ref.update({
+    playerId: pid,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    lastRoomId: null
+  });
+
+  // ★アプリ内状態も更新
+  myPlayerId = pid;
+
+  // ★右上表示が古いままにならないように即反映（保険）
+  try { updateMyPlayerLabel?.(); } catch {}
 
   // ルーム一覧へ
   showRoomListScreen();
 }
+
 
 let addPlayerReturnTo = null; // "playerConfig" or "playerSetup"
 
@@ -623,7 +605,6 @@ function openAddPlayerFromPlayerConfig() {
 function openAddPlayer() {
   // 既存の参加者設定画面から呼ぶ場合
   addPlayerReturnTo = "playerSetup";
-  playerSetupScreen.classList.add("hidden");
   addPlayerScreen.classList.remove("hidden");
   saveAppState("addPlayerScreen");
 }
@@ -635,15 +616,8 @@ function backToPlayerSetup() {
     openPlayerConfigScreen("");
     return;
   }
-
-  playerSetupScreen.classList.remove("hidden");
-  loadEntryPlayers();
 }
 
-function showRoomListScreen() {
-  showScreen("roomListScreen");
-  subscribeRooms();
-}
 function goRoomList() {
   // プレイヤー設定から戻るボタン用
   showRoomListScreen();
@@ -671,7 +645,9 @@ function loadRooms() {
 
 
 // ===== ルーム一覧リアルタイム購読 =====
+let roomsCache = {};
 let roomsUnsub = null;
+let entryPlayersUnsub = null;
 
 function subscribeRooms() {
   const ref = db.ref("rooms");
@@ -706,57 +682,108 @@ function subscribeRooms() {
 }
 
 function renderRoomList(rooms) {
+  roomsCache = rooms || {};
   roomList.innerHTML = "";
 
-  // ヘッダー
+  // ヘッダー（設計図：002〜008の列）
   const header = document.createElement("div");
-  header.style.fontWeight = "bold";
-  header.style.display = "flex";
-  header.style.gap = "10px";
+  header.className = "roomListHeader";
   header.innerHTML = `
-    <div style="width:150px;">ルームID</div>
-    <div style="width:100px;">ルール</div>
-    <div style="width:100px;">状態</div>
-    <div style="width:100px;">待機人数</div>
-    <div style="flex:1;">操作</div>
+    <div class="roomCell">ルームID</div>
+    <div class="roomCell">ルール</div>
+    <div class="roomCell">状態</div>
+    <div class="roomCell">座席</div>
+    <div class="roomCell">参加人数</div>
+    <div class="roomCell">操作</div>
   `;
   roomList.appendChild(header);
 
   const statusAllow = ["waiting","playing","calculating","end"];
 
-  for (const id in rooms) {
-    const r = rooms[id] || {};
+  // direction -> pid を探す（010〜013）
+  const findPidByDir = (playersObj, dir) => {
+    if (!playersObj) return null;
+    for (const [pid, p] of Object.entries(playersObj)) {
+      if (p?.direction === dir) return pid;
+    }
+    return null;
+  };
+
+  const nameByPid = (pid) => {
+    if (!pid) return "-";
+    return entryPlayers?.[pid]?.name ?? pid; // entryPlayers未読込でも pid を出す
+  };
+
+  for (const id in roomsCache) {
+    const r = roomsCache[id] || {};
     const status = r.gameConfig?.status ?? "-";
     if (!statusAllow.includes(status)) continue;
-
-    const div = document.createElement("div");
-    div.style.display = "flex";
-    div.style.gap = "10px";
-    div.style.borderBottom = "1px solid #ccc";
-    div.style.padding = "4px 0";
-
-    const playerCount = r.players
-      ? Object.values(r.players).filter(p => p?.status === "playing").length
-      : 0;
 
     const ruleText = RULES[r.gameConfig?.rule] || r.gameConfig?.rule || "-";
     const stText   = GAME_STATUS[status] || status;
 
-    div.innerHTML = `
-      <div style="width:150px;">${id}</div>
-      <div style="width:100px;">${ruleText}</div>
-      <div style="width:100px;">${stText}</div>
-      <div style="width:100px;">${playerCount}</div>
-      <div style="flex:1;">
-        ${["waiting","playing","calculating"].includes(status) ? `<button onclick="enterRoom('${id}')">入室</button>` : ""}
-        ${status === "end" ? `<button onclick="enterRoom('${id}')">結果</button>` : ""}
-        ${status === "waiting" ? `<button onclick="deleteRoom('${id}')">削除</button>` : ""}
+    // 参加人数（players/*/status == "playing"）
+    const playingCount = r.players
+      ? Object.values(r.players).filter(p => ["playing", "calculating", "end"].includes(p?.status)).length
+      : 0;
+
+    // 座席表示（東/南/西/北）
+    const pidE = findPidByDir(r.players, "東");
+    const pidS = findPidByDir(r.players, "南");
+    const pidW = findPidByDir(r.players, "西");
+    const pidN = findPidByDir(r.players, "北");
+
+    const row = document.createElement("div");
+    row.className = "roomListRow";
+
+    const btnEnter = (["waiting","playing","calculating"].includes(status))
+      ? `<button onclick="enterRoom('${id}')">入室</button>`
+      : "";
+
+    const btnResult = (status === "end")
+      ? `<button onclick="enterRoom('${id}')">結果</button>`
+      : "";
+
+    const btnDelete = (status === "waiting")
+      ? `<button onclick="deleteRoom('${id}')">削除</button>`
+      : "";
+
+    row.innerHTML = `
+      <div class="roomCell">${id}</div>
+      <div class="roomCell">${ruleText}</div>
+      <div class="roomCell">${stText}</div>
+
+      <div class="roomCell">
+        <div class="seatGrid" title="上=東 / 左=南 / 右=北 / 下=西">
+          <div class="seat empty"></div>
+          <div class="seat">${nameByPid(pidE)}</div>
+          <div class="seat empty"></div>
+
+          <div class="seat">${nameByPid(pidS)}</div>
+          <div class="seat empty"></div>
+          <div class="seat">${nameByPid(pidN)}</div>
+
+          <div class="seat empty"></div>
+          <div class="seat">${nameByPid(pidW)}</div>
+          <div class="seat empty"></div>
+        </div>
+      </div>
+
+      <div class="roomCell">${playingCount}</div>
+
+      <div class="roomCell">
+        <div class="ops">
+          ${btnEnter}
+          ${btnResult}
+          ${btnDelete}
+        </div>
       </div>
     `;
-    roomList.appendChild(div);
+
+    roomList.appendChild(row);
   }
 
-  // 0件のときの表示
+  // 0件のとき
   if (roomList.children.length === 1) {
     const div = document.createElement("div");
     div.style.padding = "8px 0";
@@ -765,6 +792,47 @@ function renderRoomList(rooms) {
   }
 }
 
+
+// entryPlayers をリアルタイム購読する関数
+function subscribeEntryPlayers() {
+  const ref = db.ref("systemConfig/entryPlayers");
+
+  if (entryPlayersUnsub) entryPlayersUnsub();
+
+  const handler = (snap) => {
+    entryPlayers = snap.val() || {};
+    // ルーム一覧が出ているなら再描画
+    renderRoomList(roomsCache);
+    updateMyPlayerLabel();   // ★追加
+  };
+
+  ref.on("value", handler);
+  entryPlayersUnsub = () => ref.off("value", handler);
+
+  ref.once("value").then(handler).catch(e => console.error("entryPlayers load error:", e));
+}
+
+// 購読開始
+function showRoomListScreen() {
+  showScreen("roomListScreen");
+  subscribeEntryPlayers();   // ★追加
+  subscribeRooms();
+  updateMyPlayerLabel();   // ★追加（entryPlayers未読込でも後で上書きされる）
+}
+
+
+function updateMyPlayerLabel() {
+  const el = document.getElementById("myPlayerLabel");
+  if (!el) return;
+
+  if (!myPlayerId) {
+    el.textContent = "";
+    return;
+  }
+
+  const name = entryPlayers?.[myPlayerId]?.name;
+  el.textContent = name ? `👤 ${name}` : "";
+}
 
 // ---------------------------
 // ルーム作成画面（新規）
@@ -920,10 +988,7 @@ async function createRoomFromCreateScreen() {
   backToRoomList();
 }
 
-function openAddPlayerFromRoomList() {
-  addPlayerReturnTo = "roomList";
-  showScreen("addPlayerScreen");
-}
+
 
 
 // 参加者設定処理（入室）
@@ -953,6 +1018,13 @@ async function enterRoom(id) {
     currentRule = gameConfig.rule || null;
 
     const my = players[myPlayerId];
+
+    console.log("[enterRoom]", {
+      myPlayerId,
+      playersKeys: Object.keys(players || {}),
+      hasMe: !!players?.[myPlayerId],
+      my: players?.[myPlayerId],
+    });
 
     // ===== 観戦判定 =====
     if (!my || !my.direction) {
@@ -992,6 +1064,10 @@ async function enterRoom(id) {
 
     const roomStatus = gameConfig.status || "waiting";
 
+    // ★追加：入室したら waiting → playing に更新
+    await ensurePlayingOnEnter(id, myPlayerId);
+
+    // （ここから既存の分岐）
     saveAppState("enterRoom");
 
     if (roomStatus === "calculating") {
@@ -1008,6 +1084,7 @@ async function enterRoom(id) {
 
     openGameScreen();
     saveAppState("gameScreen");
+    if (entryPlayersUnsub) entryPlayersUnsub();
 
   } catch (e) {
     console.error("enterRoom error:", e);
@@ -1015,6 +1092,32 @@ async function enterRoom(id) {
     backToRoomList();
   }
 }
+
+// status変更判定
+async function ensurePlayingOnEnter(roomId, playerId) {
+  if (!roomId || !playerId) return;
+
+  const playerStatusRef = db.ref(`rooms/${roomId}/players/${playerId}/status`);
+  const roomStatusRef   = db.ref(`rooms/${roomId}/gameConfig/status`);
+
+  // ---- player status ----
+  const pSnap = await playerStatusRef.once("value");
+  const pStatus = pSnap.val();
+
+  if (pStatus === "waiting") {
+    await playerStatusRef.set("playing");
+  }
+
+  // ---- room status ----
+  const rSnap = await roomStatusRef.once("value");
+  const rStatus = rSnap.val();
+
+  if (rStatus === "waiting") {
+    await roomStatusRef.set("playing");
+  }
+}
+
+
 
 // 観戦時は操作を無効化
 function applySpectatorLockUI() {
@@ -1056,149 +1159,10 @@ function openGameScreen() {
 }
 
 
-
-// =======================
-// 参加者のプルダウン＆ラジオボタン描画
-// =======================
-async function renderSeats() {
-  // roomInfoDiv 作成（1回だけ）
-  let infoDiv = document.getElementById("roomInfoDiv");
-  if (!infoDiv) {
-    infoDiv = document.createElement("div");
-    infoDiv.id = "roomInfoDiv";
-    infoDiv.style.marginBottom = "8px";
-    seatArea.appendChild(infoDiv);
-  }
-
-  // ルームの gameConfig と players をまとめて取得
-  const [configSnap, playersSnap] = await Promise.all([
-    db.ref(`rooms/${currentRoomId}/gameConfig`).once("value"),
-    db.ref(`rooms/${currentRoomId}/players`).once("value")
-  ]);
-
-  const gameConfig = configSnap.val() || {};
-  const playersData = playersSnap.val() || {};
-
-  // ルーム情報更新
-  infoDiv.innerHTML = `
-    <div>ルール：${RULES[gameConfig.rule] || gameConfig.rule}</div>
-    <div>原点：${gameConfig.startPoint ?? "-"}</div>
-    <div>返し点：${gameConfig.returnPoint ?? "-"}</div>
-  `;
-
-  // seatArea から既存プルダウン削除
-  const existingDivs = Array.from(seatArea.children).filter(d => d.id !== "roomInfoDiv");
-  existingDivs.forEach(d => seatArea.removeChild(d));
-
-  const usedPlayerIds = new Set(Object.values(seats).filter(pid => pid));
-
-  for (const dir of Object.keys(seats)) {
-    const container = document.createElement("div");
-    container.style.display = "flex";
-    container.style.alignItems = "center";
-    container.style.marginBottom = "4px";
-
-    const label = document.createElement("label");
-    label.textContent = dir;
-    label.style.marginRight = "8px";
-    container.appendChild(label);
-
-    const select = document.createElement("select");
-
-    const defaultOpt = document.createElement("option");
-    defaultOpt.value = "";
-    defaultOpt.textContent = "未選択";
-    select.appendChild(defaultOpt);
-
-    const selectedCount = Object.values(seats).filter(v => v).length;
-    const needCount = (currentRule === "3") ? 3 : 4;
-
-    // この席が未選択で、すでに必要人数が揃っているなら disabled
-    if (!seats[dir] && selectedCount >= needCount) {
-      select.disabled = true;
-    }
-
-    for (const [id, p] of Object.entries(entryPlayers)) {
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = p.name;
-
-      // 他の席にいるプレイヤーは選択不可
-      if (usedPlayerIds.has(id) && seats[dir] !== id) {
-        opt.disabled = true;
-        opt.style.color = "#999";
-      }
-
-      // すでにその席にいる場合は選択状態
-      if (seats[dir] === id) opt.selected = true;
-
-      select.appendChild(opt);
-    }
-
-    select.onchange = async e => {
-      const newPlayerId = e.target.value;
-      const oldPlayerId = seats[dir];
-
-      // 前のプレイヤーを削除
-      if (oldPlayerId && oldPlayerId !== newPlayerId) {
-        await db.ref(`rooms/${currentRoomId}/players/${oldPlayerId}`).remove();
-      }
-
-      seats[dir] = newPlayerId;
-
-      if (newPlayerId) {
-        const startPointSnap = await db.ref(`rooms/${currentRoomId}/gameConfig/startPoint`).once("value");
-        const startPoint = startPointSnap.val();
-
-        await db.ref(`rooms/${currentRoomId}/players/${newPlayerId}`).set({
-          direction: dir,
-          status: "waiting",
-          point: startPoint,
-          score: null,
-          yakitoriFlg: true
-        });
-
-        currentGameInfo.playerId = newPlayerId;
-        currentGameInfo.direction = dir;
-        currentGameInfo.status = "waiting";
-      } else {
-        currentGameInfo.playerId = null;
-        currentGameInfo.direction = null;
-        currentGameInfo.status = null;
-      }
-
-      checkStart();
-      saveAppState("playerSetupScreen");
-    };
-
-    container.appendChild(select);
-    seatArea.appendChild(container);
-  }
-}
-
-
-function loadEntryPlayers() {
-  db.ref("systemConfig/entryPlayers").once("value").then(snap => {
-    entryPlayers = snap.val() || {};
-    renderSeats();
-  });
-}
-
-let selectedSeat = "";
-
-// 対局開始ボタン制御
-function checkStart() {
-  const count = Object.values(seats).filter(v=>v).length;
-  const need = currentRule==="3" ? 3 : 4;
-  startBtn.disabled = count !== need;
-}
-
-
 // ================= プレイヤー追加 =================
-function openAddPlayer() {
-  playerSetupScreen.classList.add("hidden");
-  addPlayerScreen.classList.remove("hidden");
-  saveAppState("addPlayerScreen");
+function openAddPlayerFromRoomList() {
+  addPlayerReturnTo = "roomList";
+  showScreen("addPlayerScreen");
 }
 
 function addPlayer() {
@@ -1218,7 +1182,6 @@ function addPlayer() {
 // ===============================
 async function renderPlayerSelect() {
   if (!currentRoomId) return;
-  playerSetupScreen.classList.add("hidden");
   playerSelectScreen.classList.remove("hidden");
   saveAppState("playerSelectScreen");
 
@@ -1324,7 +1287,6 @@ function setDiff(elId, diff){
 function openGameScreen() {
   loginScreen?.classList.add("hidden");
   roomListScreen?.classList.add("hidden");
-  playerSetupScreen?.classList.add("hidden");
   addPlayerScreen?.classList.add("hidden");
   playerSelectScreen?.classList.add("hidden"); // ←戻す
   gameScreen.classList.remove("hidden");
@@ -1692,33 +1654,70 @@ function renderSpectatorUI(players, gameConfig, entryPlayers) {
 // 対局終了ボタン
 // ===============================
 async function endGame() {
-  const myPid = currentGameInfo.playerId;
-  if (!myPid) return;
+  try {
+    if (!currentRoomId) return;
+    if (isSpectatorMode) return;
 
-  // 自分を calculating に
-  await db.ref(`rooms/${currentRoomId}/players/${myPid}/status`).set("calculating");
+    const myPid = myPlayerId || currentGameInfo.playerId;
+    if (!myPid) return;
 
-  // ★反映後の players を取り直す
-  const playersSnap = await db.ref(`rooms/${currentRoomId}/players`).once("value");
-  const players = playersSnap.val() || {};
+    const myStatusRef = db.ref(`rooms/${currentRoomId}/players/${myPid}/status`);
 
-  const calcCount = Object.values(players).filter(p => p?.status === "calculating").length;
-  const need = (currentRule === "3") ? 3 : 4;
+    // 1) 現在の自分statusを確認（playing のときだけ calculating にする）
+    const stSnap = await myStatusRef.once("value");
+    const cur = stSnap.val();
 
-  if (calcCount >= need) {
-    const statusRef = db.ref(`rooms/${currentRoomId}/gameConfig/status`);
-    await statusRef.transaction(cur => {
-      // end なら触らない
-      if (cur === "end") return;
-      // すでに calculating でも触らない
-      if (cur === "calculating") return;
-      // waiting/playing どちらでも calculating にする
-      return "calculating";
-    });
+    if (cur !== "playing") {
+      console.log("[endGame] skipped: status is not playing", { cur });
+      alert("対局中(playing)の状態でのみ終了できます。");
+      return;
+    }
+
+    // 1.5) 全員が returnPoint 以上かチェック
+    const [playersSnap, configSnap] = await Promise.all([
+      db.ref(`rooms/${currentRoomId}/players`).once("value"),
+      db.ref(`rooms/${currentRoomId}/gameConfig`).once("value"),
+    ]);
+
+    const players = playersSnap.val() || {};
+    const gameConfig = configSnap.val() || {};
+
+    const returnPoint = Number(gameConfig.returnPoint || 0);
+
+    const notReached = Object.values(players)
+      .filter(p => p?.direction) // 参加者のみ
+      .some(p => Number(p.point || 0) < returnPoint);
+
+    if (notReached) {
+      alert(`どの対局者も${returnPoint}点に達していないため終了できません`);
+      return;
+    }
+
+    // 2) calculating へ更新（set を使用）
+    await myStatusRef.set("calculating");
+
+    const need = (gameConfig.rule === "3") ? 3 : 4;
+
+    // 参加者のみ（directionがある人）を対象に counting
+    const calcCount = Object.values(players)
+      .filter(p => p?.direction)
+      .filter(p => p?.status === "calculating")
+      .length + 1; // ← 今回自分が calculating になった分を加算
+
+    // 3) 最後の人が押したら roomStatus を calculating に（set を使用）
+    if (calcCount >= need) {
+      await db.ref(`rooms/${currentRoomId}/gameConfig/status`).set("calculating");
+      // subscribeRoomStatus() が全員を集計中画面へ遷移させる想定
+    }
+
+    alert("対局終了を送信しました。");
+
+  } catch (e) {
+    console.error("endGame error:", e);
+    alert("対局終了の更新に失敗しました。\n" + (e?.message ?? e));
   }
-
-  alert("対局終了を送信しました。");
 }
+
 
 
 
@@ -1729,7 +1728,6 @@ function openCalculatingScreen() {
   // 画面切替
   loginScreen?.classList.add("hidden");
   roomListScreen?.classList.add("hidden");
-  playerSetupScreen?.classList.add("hidden");
   addPlayerScreen?.classList.add("hidden");
   playerSelectScreen?.classList.add("hidden");
   gameScreen?.classList.add("hidden");
@@ -1987,7 +1985,6 @@ function openEndScreen() {
   // 画面切替
   loginScreen?.classList.add("hidden");
   roomListScreen?.classList.add("hidden");
-  playerSetupScreen?.classList.add("hidden");
   addPlayerScreen?.classList.add("hidden");
   playerSelectScreen?.classList.add("hidden");
   gameScreen?.classList.add("hidden");
@@ -2100,6 +2097,7 @@ function renderEndScreen(players, gameConfig, entryPlayers) {
 // 画面離脱時は購読解除
 function stopAllSubscriptions() {
   if (roomsUnsub) roomsUnsub();
+  if (entryPlayersUnsub) entryPlayersUnsub(); // ★追加
   if (gameStateUnsub) gameStateUnsub();
   if (calcUnsub) calcUnsub();
   if (endUnsub) endUnsub();
@@ -2122,13 +2120,8 @@ function backToPlayerSetup() {
     openPlayerConfigScreen("");
     return;
   }
-  if (addPlayerReturnTo === "roomList") {
-    showRoomListScreen();
-    return;
-  }
-
-  playerSetupScreen.classList.remove("hidden");
-  loadEntryPlayers();
+  // それ以外はルーム一覧へ
+  showRoomListScreen();
 }
 
 
@@ -2141,6 +2134,7 @@ function backToRoomList() {
     if (gameStateUnsub) { gameStateUnsub(); gameStateUnsub = null; }
     if (endUnsub) { endUnsub(); endUnsub = null; }
     if (roomsUnsub) { roomsUnsub(); roomsUnsub = null; }
+    if (entryPlayersUnsub) { entryPlayersUnsub(); entryPlayersUnsub = null; } // ★追加（任意）
 
     hideAllScreens();
 
@@ -2150,7 +2144,8 @@ function backToRoomList() {
     roomListScreen.classList.remove("hidden");
 
     // 一覧描画
-    subscribeRooms(); // これで renderRoomList が走る
+    subscribeEntryPlayers();
+    subscribeRooms();
   } catch (e) {
     console.error("backToRoomList error:", e);
 
