@@ -1047,7 +1047,19 @@ async function createRoomFromCreateScreen() {
   backToRoomList();
 }
 
+// 時刻ユニークID生成
+function genTransferRequestId(){
+  const d = new Date();
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const pad3 = (n) => String(n).padStart(3, "0");
 
+  const ymd = `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}`;
+  const hms = `${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
+  const ms  = pad3(d.getMilliseconds());
+  const rnd = pad3(Math.floor(Math.random() * 1000));
+
+  return `${ymd}_${hms}_${ms}_${rnd}`;
+}
 
 
 // 参加者設定処理（入室）
@@ -1453,7 +1465,7 @@ async function onRiichiAdd(){
   const before = Number(me.point ?? 0);
   const after  = before - 1000;
 
-  const reqId = genUUID();
+  const reqId = genTransferRequestId();
   const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
 
   const updates = {};
@@ -1504,7 +1516,7 @@ async function onRiichiTake(){
   const gain = cnt * 1000;
   const after = before + gain;
 
-  const reqId = genUUID();
+  const reqId = genTransferRequestId();
   const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
 
   const updates = {};
@@ -1798,8 +1810,8 @@ async function confirmTransfer(){
   const fromAfter = fromBefore - point;
   const toAfter   = toBefore + point;
 
-  // transferRequests に記録（UUID）
-  const reqId = genUUID();
+  // transferRequests に記録
+  const reqId = genTransferRequestId();
   const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
 
   // multi-location update（transaction禁止）
@@ -1952,17 +1964,6 @@ function renderSpectatorUI(players, gameConfig, entryPlayers) {
     el.classList.remove("tapTarget");
   }
 
-}
-
-// UUID生成
-function genUUID(){
-  if (crypto?.randomUUID) return crypto.randomUUID();
-  // フォールバック
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 }
 
 let currentReceiveReqId = null;
