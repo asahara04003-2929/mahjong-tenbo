@@ -621,3 +621,32 @@ body{
 .yakitoriImg.is-hidden {
   display: none !important;
 }
+
+/* 集計画面：ヤキトリボタン（画像） */
+.yakitoriBtn{
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  perspective: 700px;           /* 3D感 */
+}
+
+.yakitoriBtn:disabled{
+  opacity: .35;
+  cursor: default;
+}
+
+/* 画像（カード面） */
+.yakitoriBtnImg{
+  display: block;
+  width: 96px;                  /* 好みで調整 */
+  height: auto;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  transition: transform 260ms ease;
+}
+
+/* ひっくり返す */
+.yakitoriBtn.is-flipping .yakitoriBtnImg{
+  transform: rotateY(180deg);
+}

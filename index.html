@@ -347,7 +347,9 @@ select { margin-left:6px; }
 
   <!-- 002（上のボタン） -->
   <div style="text-align:center; margin-bottom:6px;">
-    <button id="btnYakitoriTop" onclick="toggleYakitoriByPos('N')">-</button> <!-- 002 -->
+    <button id="btnYakitoriTop" class="yakitoriBtn" onclick="toggleYakitoriByPos('N')">
+      <img class="yakitoriBtnImg" src="image/yakitori_off.png" alt="ヤキトリ">
+    </button>
   </div>
 
   <!-- 010（上のスコア表示） -->
@@ -357,13 +359,19 @@ select { margin-left:6px; }
   <div style="display:flex; justify-content:space-between; align-items:center; margin:16px 0;">
     <div style="width:40%; text-align:left;">
       <div id="calcLeftName">-</div> <!-- 005 -->
-      <button id="btnYakitoriLeft" onclick="toggleYakitoriByPos('W')">-</button> <!-- 001 -->
+      <!-- 左 -->
+        <button id="btnYakitoriLeft" class="yakitoriBtn" onclick="toggleYakitoriByPos('W')">
+          <img class="yakitoriBtnImg" src="image/yakitori_off.png" alt="ヤキトリ">
+        </button>
       <div id="calcLeftScore">-</div> <!-- 009 -->
     </div>
 
     <div style="width:40%; text-align:right;">
       <div id="calcRightName">-</div> <!-- 007 -->
-      <button id="btnYakitoriRight" onclick="toggleYakitoriByPos('S')">-</button> <!-- 003 -->
+        <!-- 右 -->
+        <button id="btnYakitoriRight" class="yakitoriBtn" onclick="toggleYakitoriByPos('S')">
+          <img class="yakitoriBtnImg" src="image/yakitori_off.png" alt="ヤキトリ">
+        </button>
       <div id="calcRightScore">-</div> <!-- 011 -->
     </div>
   </div>
@@ -371,7 +379,10 @@ select { margin-left:6px; }
   <!-- 自分（008 名前 / 004 ヤキトリボタン / 012 スコア） -->
   <div style="text-align:center; margin-top:20px;">
     <div id="calcMyName">-</div> <!-- 008 -->
-    <button id="btnYakitoriMe" onclick="toggleYakitoriByPos('ME')">-</button> <!-- 004 -->
+      <!-- 自分 -->
+      <button id="btnYakitoriMe" class="yakitoriBtn" onclick="toggleYakitoriByPos('ME')">
+        <img class="yakitoriBtnImg" src="image/yakitori_off.png" alt="ヤキトリ">
+      </button>
     <div id="calcMyScore" style="margin-top:6px;">-</div> <!-- 012 -->
   </div>
 
@@ -1765,6 +1776,33 @@ function setYakitoriImg(elId, flg){
   else el.src = src; // ←ここを残すと「常に上書き」で確実（好みで）
 }
 
+function flipYakitoriBtn(btnId, nextFlg) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+
+  const img = btn.querySelector(".yakitoriBtnImg");
+  if (!img) return;
+
+  // 多重クリック対策
+  if (btn.dataset.animating === "1") return;
+  btn.dataset.animating = "1";
+
+  const nextSrc = nextFlg ? "image/yakitori_on.png" : "image/yakitori_off.png";
+
+  // ひっくり返し開始
+  btn.classList.add("is-flipping");
+
+  // 半回転あたりで画像を差し替える（それっぽく見える）
+  setTimeout(() => {
+    img.src = nextSrc;
+  }, 130);
+
+  // 戻す
+  setTimeout(() => {
+    btn.classList.remove("is-flipping");
+    btn.dataset.animating = "0";
+  }, 260);
+}
 
 
 // ===============================
@@ -2382,12 +2420,25 @@ function computeScoresForRoom(players, gameConfig) {
 function setYakitoriButton(btnId, pid, players) {
   const btn = document.getElementById(btnId);
   if (!btn) return;
-  if (!pid || !players[pid]) { btn.textContent = "-"; btn.disabled = true; return; }
+
+  const img = btn.querySelector(".yakitoriBtnImg");
+
+  // pidなし/データなしなら無効化＆非表示
+  if (!pid || !players[pid]) {
+    btn.disabled = true;
+    if (img) img.style.visibility = "hidden";
+    return;
+  }
+
+  btn.disabled = false;
+  if (img) img.style.visibility = "visible";
 
   const flg = players[pid].yakitoriFlg === true;
-  btn.textContent = flg ? "ヤキトリ" : "　　　　"; // 仕様どおり
-  btn.disabled = false;
+  const src = flg ? "image/yakitori_on.png" : "image/yakitori_off.png";
+
+  if (img && !img.src.endsWith(src)) img.src = src;
 }
+
 
 
 async function toggleYakitoriByPos(which) {
@@ -2398,10 +2449,24 @@ async function toggleYakitoriByPos(which) {
   const pid = (which === "ME") ? pos.ME : pos[which];
   if (!pid) return;
 
-  const ref = db.ref(`rooms/${currentRoomId}/players/${pid}/yakitoriFlg`);
+  // どのボタンをflipさせるか
+  const btnId =
+    which === "N"  ? "btnYakitoriTop" :
+    which === "W"  ? "btnYakitoriLeft" :
+    which === "S"  ? "btnYakitoriRight" :
+    /* ME */         "btnYakitoriMe";
+
   const cur = players[pid]?.yakitoriFlg === true;
-  await ref.set(!cur);
+  const next = !cur;
+
+  // 先にアニメーション（体感を良くする）
+  flipYakitoriBtn(btnId, next);
+
+  // DB更新（リアルタイム購読で最終的に正しい状態に収束）
+  const ref = db.ref(`rooms/${currentRoomId}/players/${pid}/yakitoriFlg`);
+  await ref.set(next);
 }
+
 
 async function finishCalculating() {
   const pid = currentGameInfo.playerId;
