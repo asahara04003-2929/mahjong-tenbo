@@ -10,7 +10,7 @@
   body { padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
   /* 例：縦は卓を大きめに */
   .gs-layout { gap: 12px; }
-  .gs-north{ top: 40px; }
+  .gs-north{ top: 5px; }
   .gs-west{ top: 150px; }
   .gs-south{ top: 150px; }
   .gs-self{ top: 300px; }
@@ -25,8 +25,8 @@
   .gs-panel { width: 320px; margin-top: 160px;}
   .gs-layout { gap: 8px; }
   .gs-north{ top: -30px; }
-  .gs-west{ top: 20px; }
-  .gs-south{ top: 20px; }
+  .gs-west{ top: 15px; }
+  .gs-south{ top: 15px; }
   .gs-self{ top: 100px; }
   /* .gs-tableWrap{
     min-height: calc(393px - env(safe-area-inset-left) - env(safe-area-inset-right));
@@ -611,9 +611,9 @@ body{
   pointer-events: none;
 }
 
-/* ヤキトリ画像を消す */
+/* ヤキトリ画像を消す（高さは残す） */
 .yakitoriImg.is-hidden {
-  display: none !important;
+  visibility: hidden !important;  /* ← display:none をやめる */
 }
 
 /* 集計画面：ヤキトリボタン（画像） */
