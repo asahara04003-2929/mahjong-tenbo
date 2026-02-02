@@ -176,12 +176,11 @@ select { margin-left:6px; }
          左：卓（点数表示）
     ========================== -->
     <section class="gs-tableWrap">
-
-
       <div id="gameTable" class="gs-table">
         <!-- 北(相手) -->
         <div class="gs-seat gs-north">
           <div class="gs-name" id="nameN">-</div>
+          <img class="yakitoriImg" id="yakitoriN" src="image/yakitori_on.png" alt="">
           <div class="gs-point" id="pointN">-</div>
           <div class="gs-diff" id="diffN">-</div>
         </div>
@@ -189,6 +188,7 @@ select { margin-left:6px; }
         <!-- 西(相手) -->
         <div class="gs-seat gs-west">
           <div class="gs-name" id="nameW">-</div>
+          <img class="yakitoriImg" id="yakitoriW" src="image/yakitori_on.png" alt="">
           <div class="gs-point" id="pointW">-</div>
           <div class="gs-diff" id="diffW">-</div>
         </div>
@@ -196,12 +196,14 @@ select { margin-left:6px; }
         <!-- 東(自分) -->
         <div class="gs-seat gs-self">
           <div class="gs-selfName" id="myName">-</div>
+          <img class="yakitoriImg" id="yakitoriME" src="image/yakitori_on.png" alt="">
           <div class="gs-selfPoint" id="myPoint">-</div>
         </div>
 
         <!-- 南(相手) -->
         <div class="gs-seat gs-south">
           <div class="gs-name" id="nameS">-</div>
+          <img class="yakitoriImg" id="yakitoriS" src="image/yakitori_on.png" alt="">
           <div class="gs-point" id="pointS">-</div>
           <div class="gs-diff" id="diffS">-</div>
         </div>
@@ -216,6 +218,7 @@ select { margin-left:6px; }
       <div class="gs-row">
         <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
         <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
+        <button class="gs-btn" id="btnHistory" onclick="openHistorySheet()">履歴</button>
       </div>
       <div class="gs-row">
       <!-- 対局終了 -->
@@ -272,6 +275,64 @@ select { margin-left:6px; }
     <button class="gs-btn gs-btnPrimary" id="btnConfirm" onclick="confirmTransfer()">確定</button>
     <button class="gs-btn" id="btnCancel" onclick="cancelTransfer()">取消</button>
   </div>
+</div>
+
+<!-- =========================
+     受取ポップアップ（paymentのみ）
+========================= -->
+<div id="receiveOverlay" class="ts-overlay hidden"></div>
+
+<div id="receiveSheet" class="ts-sheet hidden" role="dialog" aria-modal="true">
+  <div class="ts-handle"></div>
+
+  <div class="ts-header">
+    <div class="ts-title">支払情報</div>
+    <button class="ts-close" onclick="closeReceiveSheet()">×</button>
+  </div>
+
+  <div class="gs-card">
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">支払：</div>
+      <div class="gs-cardValue">
+        <span id="recvFromName">-</span> → <span id="recvToName">-</span>
+      </div>
+    </div>
+
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">支払点：</div>
+      <div class="gs-cardValue"><span id="recvPoint">-</span></div>
+    </div>
+
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">受取前：</div>
+      <div class="gs-cardValue"><span id="recvToBefore">-</span></div>
+    </div>
+
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">受取後：</div>
+      <div class="gs-cardValue"><span id="recvToAfter">-</span></div>
+    </div>
+  </div>
+
+  <div class="gs-row">
+    <button class="gs-btn gs-btnPrimary" id="btnRecvCheck" onclick="checkReceive()">確認</button>
+  </div>
+</div>
+
+<!-- =========================
+     履歴（縦スクロール）
+========================= -->
+<div id="historyOverlay" class="ts-overlay hidden" onclick="closeHistorySheet()"></div>
+
+<div id="historySheet" class="ts-sheet hidden" role="dialog" aria-modal="true">
+  <div class="ts-handle"></div>
+
+  <div class="ts-header">
+    <div class="ts-title">履歴</div>
+    <button class="ts-close" onclick="closeHistorySheet()">×</button>
+  </div>
+
+  <div id="historyList" class="historyList"></div>
 </div>
 
 
@@ -377,6 +438,10 @@ select { margin-left:6px; }
 // ============================================
 //                  スクリプト
 // ================= Firebase =================
+if (!window.firebaseConfig && typeof firebaseConfig === "undefined") {
+  alert("firebaseConfig が見つかりません。firebaseConfig.js を確認してください。");
+  throw new Error("firebaseConfig missing");
+}
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 firebase.initializeApp(window.firebaseConfig);
 const db = firebase.database();
@@ -396,6 +461,11 @@ const endScreen        = document.getElementById("endScreen");
 const loginPass        = document.getElementById("loginPass");
 const roomList         = document.getElementById("roomList");
 const newPlayerName    = document.getElementById("newPlayerName");
+const receiveSheet    = document.getElementById("receiveSheet");
+const receiveOverlay  = document.getElementById("receiveOverlay");
+const historySheet    = document.getElementById("historySheet");
+const historyOverlay  = document.getElementById("historyOverlay");
+const historyList     = document.getElementById("historyList");
 
 const APP_STATE_KEY = "mahjong_app_state";
 
@@ -412,6 +482,8 @@ let currentGameInfo = {
   status: null
 }
 let isSpectatorMode = false;
+let calcUnsub = null;
+let transferUnsub = null;
 
 // プルダウン用
 let entryPlayers = {};
@@ -996,6 +1068,8 @@ async function createRoomFromCreateScreen() {
 async function enterRoom(id) {
   try {
     stopAllSubscriptions?.();
+    historyCache = [];
+    if (historyUnsub) { historyUnsub(); historyUnsub = null; }
 
     currentRoomId = id;
 
@@ -1146,17 +1220,6 @@ function applySpectatorLockUI() {
   }
 }
 
-function openGameScreen() {
-  // ...（既存そのまま）
-
-  handler();
-  subscribeRoomStatus();
-
-  // ★追加：観戦なら操作ロック
-  if (isSpectatorMode) {
-    applySpectatorLockUI();
-  }
-}
 
 
 // ================= プレイヤー追加 =================
@@ -1290,6 +1353,8 @@ function openGameScreen() {
   addPlayerScreen?.classList.add("hidden");
   playerSelectScreen?.classList.add("hidden"); // ←戻す
   gameScreen.classList.remove("hidden");
+  historyCache = [];
+  if (historyUnsub) { historyUnsub(); historyUnsub = null; }
 
   selectedRecipient = null;
   sendAmountValue = 0;
@@ -1386,6 +1451,8 @@ function renderGameUI(players, gameConfig, entryPlayers){
   renderOpponentSlot("W", slots.W, entryPlayers, myPoint);
   // 南枠
   renderOpponentSlot("S", slots.S, entryPlayers, myPoint);
+  // ヤキトリ
+  setYakitoriImg("yakitoriME", players?.[myPid]?.yakitoriFlg === true);
 }
 
 function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
@@ -1393,7 +1460,7 @@ function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
   const pointId = rel === "N" ? "pointN" : rel === "W" ? "pointW" : "pointS";
   const diffId  = rel === "N" ? "diffN"  : rel === "W" ? "diffW"  : "diffS";
 
-  // ★タップエリア（座席全体）を取得
+  // タップエリア（座席全体）
   const seatSel = rel === "N" ? ".gs-north" : rel === "W" ? ".gs-west" : ".gs-south";
   const seatEl = document.querySelector(seatSel);
 
@@ -1403,14 +1470,26 @@ function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
     seatEl.classList.remove("tapTarget");
   }
 
+  // ヤキトリ img id
+  const yId = rel === "N" ? "yakitoriN" : rel === "W" ? "yakitoriW" : "yakitoriS";
+
+  // 空席
   if (!slot){
     setText(nameId, "-");
     setText(pointId, "-");
     setText(diffId, "-");
+    document.getElementById(yId)?.classList.add("is-hidden");
     return;
   }
 
+  // 席あり
+  document.getElementById(yId)?.classList.remove("is-hidden");
+
   const { pid, p } = slot;
+
+  // ヤキトリ画像のリアルタイム反映
+  setYakitoriImg(yId, p?.yakitoriFlg === true);
+
   const nm = entryPlayers[pid]?.name ?? "不明";
   const pt = Number(p.point ?? 0);
 
@@ -1418,11 +1497,10 @@ function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
   setText(pointId, pt);
   setDiff(diffId, myPoint - pt);
 
-  // ★座席全体タップで送り先選択 → ボトムシート表示
+  // 座席全体タップで送り先選択
   if (seatEl) {
     seatEl.classList.add("tapTarget");
 
-    // ★観戦中は無効
     if (isSpectatorMode) {
       seatEl.onclick = null;
       seatEl.classList.remove("tapTarget");
@@ -1434,30 +1512,258 @@ function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
 
 
 
+
 // ===============================
 // 013 リーチ：リーチ棒+1 / 自分point-1000
 // ===============================
 async function onRiichiAdd(){
-  const cfgRef = db.ref(`rooms/${currentRoomId}/gameConfig/riichiStickCount`);
-  const myRef  = db.ref(`rooms/${currentRoomId}/players/${currentGameInfo.playerId}/point`);
-  await cfgRef.transaction(v => (Number(v||0) + 1));
-  await myRef.transaction(v => (Number(v||0) - 1000));
+  if (!currentRoomId) return;
+  if (isSpectatorMode) return;
+
+  const roomId = currentRoomId;
+  const myPid  = currentGameInfo.playerId;
+  if (!myPid) return;
+
+  const [cfgSnap, pSnap] = await Promise.all([
+    db.ref(`rooms/${roomId}/gameConfig`).once("value"),
+    db.ref(`rooms/${roomId}/players/${myPid}`).once("value"),
+  ]);
+
+  const cfg = cfgSnap.val() || {};
+  const me  = pSnap.val() || {};
+  const before = Number(me.point ?? 0);
+  const after  = before - 1000;
+
+  const reqId = genUUID();
+  const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
+
+  const updates = {};
+  updates[`rooms/${roomId}/gameConfig/riichiStickCount`] = Number(cfg.riichiStickCount ?? 0) + 1;
+  updates[`rooms/${roomId}/players/${myPid}/point`] = after;
+
+  // pot扱い（仕様）
+  updates[reqPath] = {
+    fromPlayerId: myPid,
+    toPlayerId: "pot",
+    point: 1000,
+    fromBefore: before,
+    fromAfter: after,
+    toBefore: null,
+    toAfter: null,
+    type: "riichi",
+    status: "checked", // ポップアップ不要なので確定扱い
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedByPlayerId: myPid
+  };
+
+  await db.ref().update(updates);
 }
+
 
 // ===============================
 // 014 リーチ棒受取：自分point += 本数*1000 / リーチ棒0
 // ===============================
 async function onRiichiTake(){
-  const cfgRef = db.ref(`rooms/${currentRoomId}/gameConfig/riichiStickCount`);
-  const myRef  = db.ref(`rooms/${currentRoomId}/players/${currentGameInfo.playerId}/point`);
+  if (!currentRoomId) return;
+  if (isSpectatorMode) return;
 
-  const snap = await cfgRef.once("value");
-  const cnt = Number(snap.val() || 0);
+  const roomId = currentRoomId;
+  const myPid  = currentGameInfo.playerId;
+  if (!myPid) return;
+
+  const cfgRef = db.ref(`rooms/${roomId}/gameConfig/riichiStickCount`);
+  const [cfgSnap, meSnap] = await Promise.all([
+    cfgRef.once("value"),
+    db.ref(`rooms/${roomId}/players/${myPid}/point`).once("value"),
+  ]);
+
+  const cnt = Number(cfgSnap.val() || 0);
   if (cnt <= 0) return;
 
-  await myRef.transaction(v => (Number(v||0) + cnt * 1000));
-  await cfgRef.set(0);
+  const before = Number(meSnap.val() || 0);
+  const gain = cnt * 1000;
+  const after = before + gain;
+
+  const reqId = genUUID();
+  const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
+
+  const updates = {};
+  updates[`rooms/${roomId}/players/${myPid}/point`] = after;
+  updates[`rooms/${roomId}/gameConfig/riichiStickCount`] = 0;
+
+  // pot → 自分（受取）として履歴に残す（ポップアップ不要）
+  updates[reqPath] = {
+    fromPlayerId: "pot",
+    toPlayerId: myPid,
+    point: gain,
+    fromBefore: null,
+    fromAfter: null,
+    toBefore: before,
+    toAfter: after,
+    type: "riichi",        // 受取もriichi扱いでOK（仕様に合わせる）
+    status: "checked",
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedByPlayerId: myPid
+  };
+
+  await db.ref().update(updates);
 }
+
+
+async function checkReceive(){
+  if (!currentRoomId) return;
+  const roomId = currentRoomId;
+  const myPid = currentGameInfo.playerId;
+  if (!myPid) return;
+  if (!currentReceiveReqId) return;
+
+  const now = firebase.database.ServerValue.TIMESTAMP;
+
+  await db.ref(`rooms/${roomId}/transferRequests/${currentReceiveReqId}`).update({
+    status: "checked",
+    checkedAt: now,
+    checkedByPlayerId: myPid
+  });
+
+  closeReceiveSheet();
+}
+
+
+let historyUnsub = null;
+let historyCache = []; // 表示用（昇順）
+
+function subscribeHistory(){
+  if (!currentRoomId) return;
+  if (historyUnsub) historyUnsub();
+
+  const roomId = currentRoomId;
+  const myPid = currentGameInfo.playerId; // 観戦はnull、観戦時は履歴出さない想定ならreturn
+  if (!myPid) return;
+
+  const ref = db.ref(`rooms/${roomId}/transferRequests`);
+
+  const handler = async (snap) => {
+    const obj = snap.val();
+    if (!obj) return;
+
+    // 自分が関係あるものだけ
+    const involved = (obj.fromPlayerId === myPid || obj.toPlayerId === myPid);
+    if (!involved) return;
+
+    // キャッシュへ追加（重複防止）
+    const id = snap.key;
+    if (historyCache.some(x => x._id === id)) return;
+
+    historyCache.push({ _id: id, ...obj });
+    historyCache.sort((a,b) => Number(a.createdAt||0) - Number(b.createdAt||0));
+
+    // 表示更新
+    const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+    const ep = eSnap.val() || {};
+    renderHistoryList(ep);
+  };
+
+  ref.on("child_added", handler);
+  historyUnsub = () => ref.off("child_added", handler);
+}
+
+const transferRequestType = {
+  "payment": "支払", 
+  "riichi": "リーチ棒"
+}
+
+const transferRequestStatus = {
+  "pending": "未確認",
+  "checked": "確認済"
+} 
+
+// 履歴購読
+function renderHistoryList(entryPlayers){
+  if (!historyList) return;
+
+  const nameOf = (pid) => {
+    if (!pid) return "-";
+    if (pid === "pot") return "場";
+    return entryPlayers?.[pid]?.name ?? pid;
+  };
+
+  const fmtTime = (ts) => {
+    const t = Number(ts || 0);
+    if (!t) return "-";
+    const d = new Date(t);
+    const pad = (n)=>String(n).padStart(2,"0");
+    return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  historyList.innerHTML = "";
+
+  for (const h of historyCache){
+
+    const type = transferRequestType[h.type] || "-";
+    const status = transferRequestStatus[h.status] || "";
+
+    // ---- タイトル表示 ----
+    let badge = type;
+    if (type === transferRequestType["payment"]) {
+      badge = `${type} / ${status}`;
+    }
+
+    const from = nameOf(h.fromPlayerId);
+    const to   = nameOf(h.toPlayerId);
+
+    // ---- 名前行 ----
+    const whoLine =
+      h.fromPlayerId === "pot"
+        ? `場 → ${to}`
+        : `${from} → ${to}`;
+
+    const item = document.createElement("div");
+    item.className = "historyItem";
+
+    item.innerHTML = `
+      <div class="historyTop">
+        <div>${fmtTime(h.createdAt)}</div>
+        <div class="historyBadge">${badge}</div>
+      </div>
+
+      <div class="historyMain">
+        <div class="historyWho">${whoLine}</div>
+        <div class="historyPoint">${Number(h.point ?? 0)}</div>
+      </div>
+
+      <div class="historyMeta">
+        <div>from: ${h.fromPlayerId === "pot" ? "場" : (h.fromBefore ?? "-")} → ${h.fromAfter ?? "-"}</div>
+        <div>to: ${h.toBefore ?? "-"} → ${h.toAfter ?? "-"}</div>
+      </div>
+    `;
+
+    historyList.appendChild(item);
+  }
+
+  if (historyCache.length === 0){
+    const div = document.createElement("div");
+    div.style.opacity = ".8";
+    div.textContent = "履歴がありません。";
+    historyList.appendChild(div);
+  }
+}
+
+
+function setYakitoriImg(elId, flg){
+  const el = document.getElementById(elId);
+  if (!el) return;
+
+  // true=on / false=off
+  const src = flg ? "image/yakitori_on.png" : "image/yakitori_off.png";
+
+  // 毎回上書き（確実にリアルタイム反映）
+  if (el.src.endsWith(src) === false) el.src = src;
+  else el.src = src; // ←ここを残すと「常に上書き」で確実（好みで）
+}
+
+
 
 // ===============================
 // 019-021 送り先選択（常にアクティブ）
@@ -1517,14 +1823,20 @@ function cancelTransfer(){
 async function confirmTransfer(){
   if (!selectedRecipient) return;
   if (sendAmountValue <= 0) return;
+  if (!currentRoomId) return;
+  if (isSpectatorMode) return;
 
-  const pSnap = await db.ref(`rooms/${currentRoomId}/players`).once("value");
+  const roomId = currentRoomId;
+
+  // 現在の players と entryPlayers を取得（名前表示用は別途でOKだが、まず点数用）
+  const pSnap = await db.ref(`rooms/${roomId}/players`).once("value");
   const players = pSnap.val() || {};
+
   const myPid = currentGameInfo.playerId;
   const my = players[myPid];
   if (!my) return;
 
-  // 相手pid解決
+  // 相手pid解決（relから）
   let targetPid = null;
   for (const [pid, p] of Object.entries(players)){
     if (pid === myPid) continue;
@@ -1533,15 +1845,45 @@ async function confirmTransfer(){
   }
   if (!targetPid) return;
 
-  const myPointRef = db.ref(`rooms/${currentRoomId}/players/${myPid}/point`);
-  const tgPointRef = db.ref(`rooms/${currentRoomId}/players/${targetPid}/point`);
+  const fromBefore = Number(players?.[myPid]?.point ?? 0);
+  const toBefore   = Number(players?.[targetPid]?.point ?? 0);
+  const point      = Number(sendAmountValue);
 
-  // 同時更新（transactionで安全寄りに）
-  await myPointRef.transaction(v => Number(v||0) - sendAmountValue);
-  await tgPointRef.transaction(v => Number(v||0) + sendAmountValue);
+  const fromAfter = fromBefore - point;
+  const toAfter   = toBefore + point;
 
-  cancelTransfer();
+  // transferRequests に記録（UUID）
+  const reqId = genUUID();
+  const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
+
+  // multi-location update（transaction禁止）
+  const updates = {};
+  updates[`rooms/${roomId}/players/${myPid}/point`] = fromAfter;
+  updates[`rooms/${roomId}/players/${targetPid}/point`] = toAfter;
+
+  // paymentの場合：受け取り側 yakitoriFlg を false に更新（仕様）
+  updates[`rooms/${roomId}/players/${targetPid}/yakitoriFlg`] = false;
+
+  updates[reqPath] = {
+    fromPlayerId: myPid,
+    toPlayerId: targetPid,
+    point,
+    fromBefore,
+    fromAfter,
+    toBefore,
+    toAfter,
+    type: "payment",
+    status: "pending",
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedAt: null,
+    checkedByPlayerId: null
+  };
+
+  await db.ref().update(updates);
+
+  cancelTransfer(); // UIリセット
 }
+
 
 // リーチ棒表示
 function renderRiichiSticks(count){
@@ -1630,6 +1972,28 @@ function renderSpectatorUI(players, gameConfig, entryPlayers) {
   // リーチ棒
   setText("riichiCount", Number(gameConfig?.riichiStickCount ?? 0));
 
+  // ヤキトリ（空席は非表示）
+  const setYakitoriByPid = (imgId, pid) => {
+    const el = document.getElementById(imgId);
+    if (!el) return;
+
+    if (!pid) {
+      el.classList.add("is-hidden");
+      return;
+    }
+    el.classList.remove("is-hidden");
+    setYakitoriImg(imgId, players?.[pid]?.yakitoriFlg === true);
+  };
+
+  // 上=東 => yakitoriN
+  setYakitoriByPid("yakitoriN", pidE);
+  // 左=南 => yakitoriW
+  setYakitoriByPid("yakitoriW", pidS);
+  // 中央=西 => yakitoriME
+  setYakitoriByPid("yakitoriME", pidW);
+  // 下=北 => yakitoriS
+  setYakitoriByPid("yakitoriS", pidN);
+
   // 観戦は席タップで送金などをさせない（毎回念押し）
   const seatEls = [
     document.querySelector(".gs-north"),
@@ -1641,13 +2005,117 @@ function renderSpectatorUI(players, gameConfig, entryPlayers) {
     el.onclick = null;
     el.classList.remove("tapTarget");
   }
+
+}
+
+// UUID生成
+function genUUID(){
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  // フォールバック
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+let currentReceiveReqId = null;
+
+// 受取ポップアップ 開閉
+function openReceiveSheet(){
+  receiveOverlay.classList.remove("hidden");
+  receiveSheet.classList.remove("hidden");
+  requestAnimationFrame(() => receiveSheet.classList.add("is-open"));
+}
+
+function closeReceiveSheet(){
+  receiveSheet.classList.remove("is-open");
+  receiveOverlay.classList.add("hidden");
+  setTimeout(() => receiveSheet.classList.add("hidden"), 230);
+  currentReceiveReqId = null;
+}
+
+async function loadHistoryOnce(){
+  if (!currentRoomId) return;
+
+  const myPid = currentGameInfo.playerId;
+  if (!myPid) return; // 観戦は履歴出さないならここでreturn
+
+  const [tSnap, eSnap] = await Promise.all([
+    db.ref(`rooms/${currentRoomId}/transferRequests`).once("value"),
+    db.ref(`systemConfig/entryPlayers`).once("value")
+  ]);
+
+  const all = tSnap.val() || {};
+  const ep  = eSnap.val() || {};
+
+  historyCache = Object.entries(all)
+    .map(([id, v]) => ({ _id: id, ...(v || {}) }))
+    .filter(h => h && (h.fromPlayerId === myPid || h.toPlayerId === myPid))
+    .sort((a,b) => Number(a.createdAt||0) - Number(b.createdAt||0));
+
+  renderHistoryList(ep);
+}
+
+// 履歴シート 表示
+async function openHistorySheet(){
+  historyOverlay.classList.remove("hidden");
+  historySheet.classList.remove("hidden");
+  requestAnimationFrame(() => historySheet.classList.add("is-open"));
+
+  // ★追加：まず全件表示 → その後リアルタイム更新
+  historyCache = [];
+  await loadHistoryOnce();
+  subscribeHistory();
 }
 
 
+// 履歴シート 非表示
+function closeHistorySheet(){
+  historySheet.classList.remove("is-open");
+  historyOverlay.classList.add("hidden");
+  setTimeout(() => historySheet.classList.add("hidden"), 230);
+}
 
+// 購読関数
+function subscribeTransferRequests(){
+  if (!currentRoomId) return;
+  if (transferUnsub) transferUnsub();
 
+  const roomId = currentRoomId;
+  const myPid = currentGameInfo.playerId;
+  if (!myPid) return;
 
+  const ref = db.ref(`rooms/${roomId}/transferRequests`);
 
+  const handler = async (snap) => {
+    const req = snap.val();
+    if (!req) return;
+
+    // payment だけ受取側にポップアップ（pendingのみ）
+    if (req.type === "payment" && req.status === "pending" && req.toPlayerId === myPid) {
+      // 名前表示用
+      const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+      const ep = eSnap.val() || {};
+      const fromName = ep[req.fromPlayerId]?.name ?? req.fromPlayerId;
+      const toName   = ep[req.toPlayerId]?.name ?? req.toPlayerId;
+
+      currentReceiveReqId = snap.key;
+
+      setText("recvFromName", fromName);
+      setText("recvToName", toName);
+      setText("recvPoint", String(req.point ?? "-"));
+      setText("recvToBefore", String(req.toBefore ?? "-"));
+      setText("recvToAfter", String(req.toAfter ?? "-"));
+
+      openReceiveSheet();
+    }
+  };
+
+  // child_added だと古い履歴も全部来る → 「未チェックのものだけ拾う」のでOK
+  ref.on("child_added", handler);
+  transferUnsub = () => ref.off("child_added", handler);
+}
 
 
 // ===============================
@@ -1722,7 +2190,7 @@ async function endGame() {
 
 
 
-let calcUnsub = null;
+
 
 function openCalculatingScreen() {
   // 画面切替
@@ -2101,6 +2569,8 @@ function stopAllSubscriptions() {
   if (gameStateUnsub) gameStateUnsub();
   if (calcUnsub) calcUnsub();
   if (endUnsub) endUnsub();
+  if (transferUnsub) transferUnsub();
+  if (historyUnsub) historyUnsub();
 }
 
 

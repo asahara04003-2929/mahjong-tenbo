@@ -541,3 +541,83 @@ body{
   text-shadow: 0 1px 0 rgba(255,255,255,.4);
 }
 
+
+/* ===== 共通カード行（ポップアップで使用） ===== */
+.gs-cardRow{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:6px 0;
+}
+.gs-cardLabel{ font-size:12px; opacity:.85; width:70px; }
+.gs-cardValue{ font-size:16px; font-weight:900; }
+
+/* ===== 履歴 ===== */
+.historyList{
+  max-height: 60vh;
+  overflow-y: auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  padding-bottom: 8px;
+}
+.historyItem{
+  background:#fff;
+  border:2px solid #222;
+  border-radius:10px;
+  padding:10px;
+}
+.historyTop{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  font-size:12px;
+  opacity:.85;
+}
+.historyMain{
+  margin-top:6px;
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:10px;
+}
+.historyWho{
+  font-weight:900;
+  font-size:14px;
+}
+.historyPoint{
+  font-weight:900;
+  font-size:18px;
+}
+.historyMeta{
+  margin-top:6px;
+  font-size:12px;
+  opacity:.9;
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+}
+.historyBadge{
+  font-weight:900;
+  padding:2px 8px;
+  border:2px solid #222;
+  border-radius:999px;
+  font-size:12px;
+}
+
+/* ===== ヤキトリ画像（点数枠右下） ===== */
+.gs-seat{ position:absolute; } /* 既存ありだが念押し */
+.yakitoriImg{
+  position:absolute;
+  top: 5px;
+  right: 5px;
+  width:42px;
+  height:auto;
+  pointer-events:none;
+}
+
+/* ヤキトリ画像を消す */
+.yakitoriImg.is-hidden {
+  display: none !important;
+}
