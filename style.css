@@ -464,15 +464,18 @@ body{
 }
 
 
-/* ===== リーチ棒HUD（左上・赤枠位置）===== */
+/* ===== リーチ棒HUD（h2の直下）===== */
 .riichiHUD{
-  position:absolute;
-  top: 44px;      /* ここを調整（赤枠に合わせる） */
-  left: 14px;     /* ここを調整（赤枠に合わせる） */
-  display:flex;
-  align-items:center;
+  position: relative;          /* ← absoluteやめる */
+  top: auto;                   /* ← 不要なのでリセット */
+  left: auto;                  /* ← 不要なのでリセット */
+
+  display: inline-flex;
+  align-items: center;
   gap: 10px;
-  z-index: 5;
+
+  margin: 6px 0 10px;          /* h2直下の余白（好みで調整） */
+  z-index: auto;               /* ← もう重ねないので不要 */
 }
 
 /* リーチ棒（CSSで描画） */

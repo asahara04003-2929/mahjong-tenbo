@@ -144,6 +144,11 @@ select { margin-left:6px; }
 <!-- ========================================= -->
 <div id="gameScreen" class="hidden">
   <h2 class="gs-title">対局中</h2>
+  <!-- リーチ棒表示（左上） -->
+  <div id="riichiHUD" class="riichiHUD" aria-label="リーチ棒">
+    <span class="riichiStick" aria-hidden="true"></span>
+    <span class="riichiTimes">×<span id="riichiCount">0</span></span>
+  </div>
   <div class="gs-layout">
     <!-- =========================
          左：卓（点数表示）
@@ -200,11 +205,6 @@ select { margin-left:6px; }
       <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
     </div>
   </aside>
-  <!-- リーチ棒表示（左上） -->
-  <div id="riichiHUD" class="riichiHUD" aria-label="リーチ棒">
-    <span class="riichiStick" aria-hidden="true"></span>
-    <span class="riichiTimes">×<span id="riichiCount">0</span></span>
-  </div>
 </div>
 
 
@@ -2731,8 +2731,13 @@ window.addEventListener("load", async () => {
 
 
 function setRealVH(){
-  const vh = (window.visualViewport?.height -30 ?? window.innerHeight - 30) * 0.01;
-  document.documentElement.style.setProperty("--vh", `${vh}px`);
+  const vv = window.visualViewport;
+  const baseH = (vv?.height ?? window.innerHeight);
+
+  const isPortrait = vv ? (vv.height >= vv.width) : (window.innerHeight >= window.innerWidth);
+
+  const adjustedH = baseH - (isPortrait ? 60 : 0);
+  document.documentElement.style.setProperty("--vh", `${adjustedH * 0.01}px`);
 }
 
 // 端末が回転した直後は値が揺れることがあるので、
