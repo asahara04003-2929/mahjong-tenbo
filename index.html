@@ -476,8 +476,8 @@ let transferUnsub = null;
 // プルダウン用
 let entryPlayers = {};
 
-const RULES = {"3":"３麻", "3r4":"３麻４人回", "4":"４麻"};
-const GAME_STATUS = {"waiting": "待機中","playing": "対局中", "calculating": "集計中", "end":"対局終了"}
+const RULES = {"3":"3麻", "3r4":"3麻4人", "4":"4麻"};
+const GAME_STATUS = {"waiting": "待機","playing": "対局", "calculating": "集計", "end":"終了"}
 
 // 全画面非表示
 function hideAllScreens() {
@@ -751,8 +751,7 @@ function renderRoomList(rooms) {
     <div class="roomCell">ルームID</div>
     <div class="roomCell">ルール</div>
     <div class="roomCell">状態</div>
-    <div class="roomCell">座席</div>
-    <div class="roomCell">参加人数</div>
+    <div class="roomCell">参加者</div>
     <div class="roomCell">操作</div>
   `;
   roomList.appendChild(header);
@@ -781,11 +780,6 @@ function renderRoomList(rooms) {
     const ruleText = RULES[r.gameConfig?.rule] || r.gameConfig?.rule || "-";
     const stText   = GAME_STATUS[status] || status;
 
-    // 参加人数（players/*/status == "playing"）
-    const playingCount = r.players
-      ? Object.values(r.players).filter(p => ["playing", "calculating", "end"].includes(p?.status)).length
-      : 0;
-
     // 座席表示（東/南/西/北）
     const pidE = findPidByDir(r.players, "東");
     const pidS = findPidByDir(r.players, "南");
@@ -813,22 +807,11 @@ function renderRoomList(rooms) {
       <div class="roomCell">${stText}</div>
 
       <div class="roomCell">
-        <div class="seatGrid" title="上=東 / 左=南 / 右=北 / 下=西">
-          <div class="seat empty"></div>
-          <div class="seat">${nameByPid(pidE)}</div>
-          <div class="seat empty"></div>
-
-          <div class="seat">${nameByPid(pidS)}</div>
-          <div class="seat empty"></div>
-          <div class="seat">${nameByPid(pidN)}</div>
-
-          <div class="seat empty"></div>
-          <div class="seat">${nameByPid(pidW)}</div>
-          <div class="seat empty"></div>
-        </div>
+        <div>${nameByPid(pidE)}</div>
+        <div>${nameByPid(pidS)}</div>
+        <div>${nameByPid(pidN)}</div>
+        <div>${nameByPid(pidW)}</div>
       </div>
-
-      <div class="roomCell">${playingCount}</div>
 
       <div class="roomCell">
         <div class="ops">
@@ -2730,37 +2713,121 @@ window.addEventListener("load", async () => {
   await bootstrapAfterLogin();
 });
 
+let vhT1 = null;
+let vhT2 = null;
+let vhT3 = null;
 
-function setRealVH(){
+function isPortraitNow() {
+  // orientationchange直後は innerWidth/innerHeight が嘘をつくことがあるので、
+  // visualViewport があればそっち優先
   const vv = window.visualViewport;
-  const baseH = (vv?.height ?? window.innerHeight);
-
-  const isPortrait = vv ? (vv.height >= vv.width) : (window.innerHeight >= window.innerWidth);
-
-  const adjustedH = baseH - (isPortrait ? 100 : 30);
-  document.documentElement.style.setProperty("--vh", `${adjustedH * 0.01}px`);
+  if (vv) return vv.height >= vv.width;
+  return window.matchMedia("(orientation: portrait)").matches;
 }
 
-// 端末が回転した直後は値が揺れることがあるので、
-// 1回 + 次フレーム + 少し後(保険) で再計算
-function refreshVH(){
+function setRealVH() {
+  const vv = window.visualViewport;
+  const baseH = vv?.height ?? window.innerHeight;
+
+  const isPortrait = isPortraitNow();
+
+  // あなたの現状仕様を維持（縦: -100 / 横: -30）
+  const adjustedH = baseH - (isPortrait ? 100 : 30);
+
+  // 念のためマイナス防止
+  const safeH = Math.max(0, adjustedH);
+
+  document.documentElement.style.setProperty("--vh", `${safeH * 0.01}px`);
+}
+
+function resetScrollForIOS() {
+  // 回転直後に iOS が変な scroll/scale 状態を持つことがあるのでゼロに寄せる
+  //（ページ内スクロールさせないUIなら副作用ほぼ無し）
+  window.scrollTo(0, 0);
+}
+
+function refreshVH() {
+  // まず即時
   setRealVH();
-  requestAnimationFrame(setRealVH);
-  setTimeout(setRealVH, 200);
+  resetScrollForIOS();
+
+  // 次フレーム
+  requestAnimationFrame(() => {
+    setRealVH();
+    resetScrollForIOS();
+  });
+
+  // 回転直後の“揺れ”対策：50ms/250ms/600ms あたりで再確定
+  clearTimeout(vhT1);
+  clearTimeout(vhT2);
+  clearTimeout(vhT3);
+
+  vhT1 = setTimeout(() => {
+    setRealVH();
+    resetScrollForIOS();
+  }, 50);
+
+  vhT2 = setTimeout(() => {
+    setRealVH();
+    resetScrollForIOS();
+  }, 250);
+
+  vhT3 = setTimeout(() => {
+    setRealVH();
+    resetScrollForIOS();
+  }, 600);
 }
 
 // 初期化
 refreshVH();
 
-// 既存：リサイズ
-window.addEventListener("resize", refreshVH);
-window.visualViewport?.addEventListener("resize", refreshVH);
+// リサイズ（既存）
+window.addEventListener("resize", refreshVH, { passive: true });
 
-// ★追加：縦横切替のたびに実行（これが目的）
-window.addEventListener("orientationchange", refreshVH);
+// visualViewport（既存 + scroll 追加が効くこと多い）
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", refreshVH, { passive: true });
+  window.visualViewport.addEventListener("scroll", refreshVH, { passive: true });
+}
 
-// （任意：iOS Safari対策）ページが戻ってきた時にも再計算
-window.addEventListener("pageshow", refreshVH);
+// 縦横切替（既存）
+window.addEventListener("orientationchange", refreshVH, { passive: true });
+
+// iOS Safari / PWA：復帰時にズレる対策（既存）
+window.addEventListener("pageshow", refreshVH, { passive: true });
+
+
+// 旧のソースコード
+// function setRealVH(){
+//   const vv = window.visualViewport;
+//   const baseH = (vv?.height ?? window.innerHeight);
+
+//   const isPortrait = vv ? (vv.height >= vv.width) : (window.innerHeight >= window.innerWidth);
+
+//   const adjustedH = baseH - (isPortrait ? 100 : 30);
+//   document.documentElement.style.setProperty("--vh", `${adjustedH * 0.01}px`);
+// }
+
+// // 端末が回転した直後は値が揺れることがあるので、
+// // 1回 + 次フレーム + 少し後(保険) で再計算
+// function refreshVH(){
+//   setRealVH();
+//   requestAnimationFrame(setRealVH);
+//   setTimeout(setRealVH, 200);
+// }
+
+// // 初期化
+// refreshVH();
+
+// // 既存：リサイズ
+// window.addEventListener("resize", refreshVH);
+// window.visualViewport?.addEventListener("resize", refreshVH);
+
+// // ★追加：縦横切替のたびに実行（これが目的）
+// window.addEventListener("orientationchange", refreshVH);
+
+// // （任意：iOS Safari対策）ページが戻ってきた時にも再計算
+// window.addEventListener("pageshow", refreshVH);
 
 
 
