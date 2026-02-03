@@ -2273,7 +2273,7 @@ let gyakuLatestEntryPlayers = null;
 let gyakuSelfRole = null; // "parent" | "child"
 
 // 役表示（表の順）
-const GY_LABELS = ["1役","2役","3役","満貫","跳満","倍満","3倍満","役満","ダブル役満"];
+const GY_LABELS = ["1役","2役","3役","満貫","跳満","倍満","3倍満","役満","W役満"];
 
 // 直撃点数表示変換表（画像に合わせる）
 const RON_TABLE_PARENT = [
@@ -2285,7 +2285,7 @@ const RON_TABLE_PARENT = [
   { min:36000, max:48000,  point:24000, label:GY_LABELS[5] }, // 倍満
   { min:48000, max:72000,  point:36000, label:GY_LABELS[6] }, // 3倍満
   { min:72000, max:96000,  point:48000, label:GY_LABELS[7] }, // 役満
-  { min:96000, max:192000, point:96000, label:GY_LABELS[8] }, // ダブル役満
+  { min:96000, max:192000, point:96000, label:GY_LABELS[8] }, // 役満
 ];
 
 const RON_TABLE_CHILD = [
