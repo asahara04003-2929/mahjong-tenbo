@@ -2713,37 +2713,121 @@ window.addEventListener("load", async () => {
   await bootstrapAfterLogin();
 });
 
+let vhT1 = null;
+let vhT2 = null;
+let vhT3 = null;
 
-function setRealVH(){
+function isPortraitNow() {
+  // orientationchange直後は innerWidth/innerHeight が嘘をつくことがあるので、
+  // visualViewport があればそっち優先
   const vv = window.visualViewport;
-  const baseH = (vv?.height ?? window.innerHeight);
-
-  const isPortrait = vv ? (vv.height >= vv.width) : (window.innerHeight >= window.innerWidth);
-
-  const adjustedH = baseH - (isPortrait ? 100 : 30);
-  document.documentElement.style.setProperty("--vh", `${adjustedH * 0.01}px`);
+  if (vv) return vv.height >= vv.width;
+  return window.matchMedia("(orientation: portrait)").matches;
 }
 
-// 端末が回転した直後は値が揺れることがあるので、
-// 1回 + 次フレーム + 少し後(保険) で再計算
-function refreshVH(){
+function setRealVH() {
+  const vv = window.visualViewport;
+  const baseH = vv?.height ?? window.innerHeight;
+
+  const isPortrait = isPortraitNow();
+
+  // あなたの現状仕様を維持（縦: -100 / 横: -30）
+  const adjustedH = baseH - (isPortrait ? 100 : 30);
+
+  // 念のためマイナス防止
+  const safeH = Math.max(0, adjustedH);
+
+  document.documentElement.style.setProperty("--vh", `${safeH * 0.01}px`);
+}
+
+function resetScrollForIOS() {
+  // 回転直後に iOS が変な scroll/scale 状態を持つことがあるのでゼロに寄せる
+  //（ページ内スクロールさせないUIなら副作用ほぼ無し）
+  window.scrollTo(0, 0);
+}
+
+function refreshVH() {
+  // まず即時
   setRealVH();
-  requestAnimationFrame(setRealVH);
-  setTimeout(setRealVH, 200);
+  resetScrollForIOS();
+
+  // 次フレーム
+  requestAnimationFrame(() => {
+    setRealVH();
+    resetScrollForIOS();
+  });
+
+  // 回転直後の“揺れ”対策：50ms/250ms/600ms あたりで再確定
+  clearTimeout(vhT1);
+  clearTimeout(vhT2);
+  clearTimeout(vhT3);
+
+  vhT1 = setTimeout(() => {
+    setRealVH();
+    resetScrollForIOS();
+  }, 50);
+
+  vhT2 = setTimeout(() => {
+    setRealVH();
+    resetScrollForIOS();
+  }, 250);
+
+  vhT3 = setTimeout(() => {
+    setRealVH();
+    resetScrollForIOS();
+  }, 600);
 }
 
 // 初期化
 refreshVH();
 
-// 既存：リサイズ
-window.addEventListener("resize", refreshVH);
-window.visualViewport?.addEventListener("resize", refreshVH);
+// リサイズ（既存）
+window.addEventListener("resize", refreshVH, { passive: true });
 
-// ★追加：縦横切替のたびに実行（これが目的）
-window.addEventListener("orientationchange", refreshVH);
+// visualViewport（既存 + scroll 追加が効くこと多い）
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", refreshVH, { passive: true });
+  window.visualViewport.addEventListener("scroll", refreshVH, { passive: true });
+}
 
-// （任意：iOS Safari対策）ページが戻ってきた時にも再計算
-window.addEventListener("pageshow", refreshVH);
+// 縦横切替（既存）
+window.addEventListener("orientationchange", refreshVH, { passive: true });
+
+// iOS Safari / PWA：復帰時にズレる対策（既存）
+window.addEventListener("pageshow", refreshVH, { passive: true });
+
+
+// 旧のソースコード
+// function setRealVH(){
+//   const vv = window.visualViewport;
+//   const baseH = (vv?.height ?? window.innerHeight);
+
+//   const isPortrait = vv ? (vv.height >= vv.width) : (window.innerHeight >= window.innerWidth);
+
+//   const adjustedH = baseH - (isPortrait ? 100 : 30);
+//   document.documentElement.style.setProperty("--vh", `${adjustedH * 0.01}px`);
+// }
+
+// // 端末が回転した直後は値が揺れることがあるので、
+// // 1回 + 次フレーム + 少し後(保険) で再計算
+// function refreshVH(){
+//   setRealVH();
+//   requestAnimationFrame(setRealVH);
+//   setTimeout(setRealVH, 200);
+// }
+
+// // 初期化
+// refreshVH();
+
+// // 既存：リサイズ
+// window.addEventListener("resize", refreshVH);
+// window.visualViewport?.addEventListener("resize", refreshVH);
+
+// // ★追加：縦横切替のたびに実行（これが目的）
+// window.addEventListener("orientationchange", refreshVH);
+
+// // （任意：iOS Safari対策）ページが戻ってきた時にも再計算
+// window.addEventListener("pageshow", refreshVH);
 
 
 
