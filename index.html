@@ -2778,11 +2778,23 @@ function refreshVH() {
   }, 600);
 }
 
+function resetViewportScale() {
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  meta.setAttribute("content", "width=device-width, initial-scale=1");
+  setTimeout(() => {
+    meta.setAttribute("content", "width=device-width, initial-scale=1.0, viewport-fit=cover");
+  }, 50);
+}
+
 // 初期化
 refreshVH();
 
 // リサイズ（既存）
-window.addEventListener("resize", refreshVH, { passive: true });
+window.addEventListener("orientationchange", () => {
+  resetViewportScale();
+  refreshVH();
+}, { passive: true });
 
 // visualViewport（既存 + scroll 追加が効くこと多い）
 if (window.visualViewport) {
