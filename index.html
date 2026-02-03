@@ -476,8 +476,8 @@ let transferUnsub = null;
 // プルダウン用
 let entryPlayers = {};
 
-const RULES = {"3":"３麻", "3r4":"３麻４人回", "4":"４麻"};
-const GAME_STATUS = {"waiting": "待機中","playing": "対局中", "calculating": "集計中", "end":"対局終了"}
+const RULES = {"3":"3麻", "3r4":"3麻4人", "4":"4麻"};
+const GAME_STATUS = {"waiting": "待機","playing": "対局", "calculating": "集計", "end":"終了"}
 
 // 全画面非表示
 function hideAllScreens() {
@@ -751,8 +751,7 @@ function renderRoomList(rooms) {
     <div class="roomCell">ルームID</div>
     <div class="roomCell">ルール</div>
     <div class="roomCell">状態</div>
-    <div class="roomCell">座席</div>
-    <div class="roomCell">参加人数</div>
+    <div class="roomCell">参加者</div>
     <div class="roomCell">操作</div>
   `;
   roomList.appendChild(header);
@@ -781,11 +780,6 @@ function renderRoomList(rooms) {
     const ruleText = RULES[r.gameConfig?.rule] || r.gameConfig?.rule || "-";
     const stText   = GAME_STATUS[status] || status;
 
-    // 参加人数（players/*/status == "playing"）
-    const playingCount = r.players
-      ? Object.values(r.players).filter(p => ["playing", "calculating", "end"].includes(p?.status)).length
-      : 0;
-
     // 座席表示（東/南/西/北）
     const pidE = findPidByDir(r.players, "東");
     const pidS = findPidByDir(r.players, "南");
@@ -813,22 +807,11 @@ function renderRoomList(rooms) {
       <div class="roomCell">${stText}</div>
 
       <div class="roomCell">
-        <div class="seatGrid" title="上=東 / 左=南 / 右=北 / 下=西">
-          <div class="seat empty"></div>
-          <div class="seat">${nameByPid(pidE)}</div>
-          <div class="seat empty"></div>
-
-          <div class="seat">${nameByPid(pidS)}</div>
-          <div class="seat empty"></div>
-          <div class="seat">${nameByPid(pidN)}</div>
-
-          <div class="seat empty"></div>
-          <div class="seat">${nameByPid(pidW)}</div>
-          <div class="seat empty"></div>
-        </div>
+        <div>${nameByPid(pidE)}</div>
+        <div>${nameByPid(pidS)}</div>
+        <div>${nameByPid(pidN)}</div>
+        <div>${nameByPid(pidW)}</div>
       </div>
-
-      <div class="roomCell">${playingCount}</div>
 
       <div class="roomCell">
         <div class="ops">
