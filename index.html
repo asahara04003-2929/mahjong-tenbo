@@ -63,16 +63,24 @@ select { margin-left:6px; }
 <!-- ルーム一覧 -->
 <!-- ========================================= -->
 <div id="roomListScreen" class="hidden">
-  <h2>ルーム一覧</h2>
-  <!-- ★追加：自分の名前表示 -->
-  <div id="myPlayerLabel" style="font-weight:700;"></div>
-  <!-- 上部ボタン（設計図：001,009） -->
-  <div style="display:flex; gap:10px; margin:10px 0;">
-    <button onclick="openRoomCreateScreen()">ルーム作成</button>  <!-- 001 -->
-    <button onclick="openPlayerConfigScreen()">プレイヤー設定</button>
-    <button onclick="openAddPlayerFromRoomList()">プレイヤー追加</button> <!-- 009 -->
+
+  <!-- 固定（ルーム一覧でのみ表示） -->
+  <div class="roomListTop">
+    <h2>ルーム一覧</h2>
+    <div id="myPlayerLabel" style="font-weight:700;"></div>
+
+    <div class="roomListButtons">
+      <button onclick="openRoomCreateScreen()">ルーム作成</button>
+      <button onclick="openPlayerConfigScreen()">プレイヤー設定</button>
+      <button onclick="openAddPlayerFromRoomList()">プレイヤー追加</button>
+    </div>
+
+    <div id="roomListTableHeader"></div>
   </div>
-  <div id="roomList"></div>
+
+  <!-- スクロール（ルーム一覧でのみ表示） -->
+  <div id="roomList" class="roomListScroll"></div>
+
 </div>
 
 <!-- ========================================= -->
@@ -742,9 +750,14 @@ function subscribeRooms() {
 
 function renderRoomList(rooms) {
   roomsCache = rooms || {};
+
+  // ★行一覧はここに描く（スクロール領域）
   roomList.innerHTML = "";
 
-  // ヘッダー（設計図：002〜008の列）
+  // ★列ヘッダーは固定領域へ
+  const headerHost = document.getElementById("roomListTableHeader");
+  if (headerHost) headerHost.innerHTML = "";
+
   const header = document.createElement("div");
   header.className = "roomListHeader";
   header.innerHTML = `
@@ -754,11 +767,12 @@ function renderRoomList(rooms) {
     <div class="roomCell">参加者</div>
     <div class="roomCell">操作</div>
   `;
-  roomList.appendChild(header);
+  if (headerHost) headerHost.appendChild(header);
 
   const statusAllow = ["waiting","playing","calculating","end"];
+  const statusOrder = { waiting:0, playing:1, calculating:2, end:3 };
 
-  // direction -> pid を探す（010〜013）
+  // direction -> pid を探す
   const findPidByDir = (playersObj, dir) => {
     if (!playersObj) return null;
     for (const [pid, p] of Object.entries(playersObj)) {
@@ -769,18 +783,36 @@ function renderRoomList(rooms) {
 
   const nameByPid = (pid) => {
     if (!pid) return "-";
-    return entryPlayers?.[pid]?.name ?? pid; // entryPlayers未読込でも pid を出す
+    return entryPlayers?.[pid]?.name ?? pid;
   };
 
-  for (const id in roomsCache) {
-    const r = roomsCache[id] || {};
-    const status = r.gameConfig?.status ?? "-";
-    if (!statusAllow.includes(status)) continue;
+  // ============================
+  // ★ソート（status順 → ルームID昇順）
+  // ============================
+  const entries = Object.entries(roomsCache)
+    .map(([id, r]) => {
+      const status = r?.gameConfig?.status ?? "-";
+      return { id, r: r || {}, status };
+    })
+    .filter(x => statusAllow.includes(x.status))
+    .sort((a, b) => {
+      const ao = statusOrder[a.status] ?? 99;
+      const bo = statusOrder[b.status] ?? 99;
+      if (ao !== bo) return ao - bo;
+
+      // 第2条件：ルームID 昇順（文字列でOK）
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+  // 行を描画
+  for (const x of entries) {
+    const id = x.id;
+    const r = x.r;
+    const status = x.status;
 
     const ruleText = RULES[r.gameConfig?.rule] || r.gameConfig?.rule || "-";
     const stText   = GAME_STATUS[status] || status;
 
-    // 座席表示（東/南/西/北）
     const pidE = findPidByDir(r.players, "東");
     const pidS = findPidByDir(r.players, "南");
     const pidW = findPidByDir(r.players, "西");
@@ -790,16 +822,13 @@ function renderRoomList(rooms) {
     row.className = "roomListRow";
 
     const btnEnter = (["waiting","playing","calculating"].includes(status))
-      ? `<button onclick="enterRoom('${id}')">入室</button>`
-      : "";
+      ? `<button onclick="enterRoom('${id}')">入室</button>` : "";
 
     const btnResult = (status === "end")
-      ? `<button onclick="enterRoom('${id}')">結果</button>`
-      : "";
+      ? `<button onclick="enterRoom('${id}')">結果</button>` : "";
 
     const btnDelete = (status === "waiting")
-      ? `<button onclick="deleteRoom('${id}')">削除</button>`
-      : "";
+      ? `<button onclick="deleteRoom('${id}')">削除</button>` : "";
 
     row.innerHTML = `
       <div class="roomCell">${id}</div>
@@ -826,13 +855,14 @@ function renderRoomList(rooms) {
   }
 
   // 0件のとき
-  if (roomList.children.length === 1) {
+  if (entries.length === 0) {
     const div = document.createElement("div");
     div.style.padding = "8px 0";
     div.textContent = "ルームがありません（または表示対象ステータスがありません）";
     roomList.appendChild(div);
   }
 }
+
 
 
 // entryPlayers をリアルタイム購読する関数

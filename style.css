@@ -109,8 +109,28 @@ body{
 .amtBtn{ min-width:80px; }
 
 
-/* ===== ルーム一覧画面 ===== */
+/* ===== ルーム一覧画面：上固定 / 下スクロール ===== */
+#roomListScreen{
+  height: calc(var(--vh) * 100);
+  max-height: calc(var(--vh) * 100);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 画面外に出さない */
+}
 
+/* 固定エリア */
+#roomListScreen .roomListTop{
+  flex: 0 0 auto;
+  background: #fff;
+  z-index: 10;
+}
+
+/* スクロールエリア */
+#roomList{
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* iOSでヌルヌル */
+}
 
 .roomListHeader{
   font-weight: bold;
@@ -131,7 +151,7 @@ body{
   flex-wrap: wrap;
 }
 
-
+.hidden { display: none !important; }
 
 #gameScreen{
   background-image: url(/image/background.png);
