@@ -205,6 +205,7 @@ select { margin-left:6px; }
     <div class="gs-row">
       <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
       <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
+      <button class="gs-btn" id="btnGyaku" onclick="openGyakuSheet()">逆転条件</button>
       <button class="gs-btn" id="btnHistory" onclick="openHistorySheet()">履歴</button>
     </div>
     <div class="gs-row">
@@ -299,6 +300,215 @@ select { margin-left:6px; }
     <button class="gs-btn gs-btnPrimary" id="btnRecvCheck" onclick="checkReceive()">確認</button>
   </div>
 </div>
+
+<!-- =========================
+     逆転条件（ボトムシート）
+========================= -->
+<div id="gyakuOverlay" class="ts-overlay hidden" onclick="closeGyakuSheet()"></div>
+
+<div id="gyakuSheet" class="ts-sheet hidden" role="dialog" aria-modal="true">
+  <div class="ts-handle"></div>
+
+  <div class="ts-header">
+    <div class="ts-title">逆転条件</div>
+    <button class="ts-close" onclick="closeGyakuSheet()">✕</button>
+  </div>
+
+  <!-- ★ここから下だけスクロールさせる -->
+  <div class="ts-body" id="gyakuBody">
+
+    <!-- 023: 親/子（自分の立場） -->
+    <div class="gs-card">
+      <div style="font-weight:900; margin-bottom:6px;">自分の立場</div>
+      <label style="margin-left:12px;"><input type="radio" name="gySelfRole" value="child">子</label>
+      <label><input type="radio" name="gySelfRole" value="parent">親</label>
+      <div style="margin-top:6px; font-size:12px; opacity:.8;">
+        切替で逆転条件を再計算します
+      </div>
+      <div class="gs-cardRow">
+        <div class="gs-cardLabel">トップ：</div>
+        <div class="gs-cardValue">
+          <span id="gyName">-</span>
+        </div>
+      </div>
+      <div class="gs-cardRow">
+        <div class="gs-cardLabel">自分：</div>
+        <div class="gs-cardValue">
+          <span id="gyMyName">-</span>
+        </div>
+      </div>
+      <div class="gs-cardRow">
+        <div class="gs-cardLabel">点差：</div>
+        <div class="gs-cardValue">
+          <span id="gyDiff">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 直撃（ロン） -->
+    <div class="gs-card">
+      <div style="font-weight:900; margin-bottom:6px;">直撃の場合</div>
+      <div class="gy-subCard">
+   
+        <div style="font-weight:800; margin-bottom:6px;">同卓</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue"><span id="gyRonNeed">-</span></div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonMeBefore">-</span> → <span id="gyRonMeAfter">-</span>
+            <span id="gyRonMeDelta" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">トップ：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonTopBefore">-</span> → <span id="gyRonTopAfter">-</span>
+            <span id="gyRonTopDelta" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+   
+      <!-- ★3麻4人回し：抜け番（ロン） -->
+      <div id="gyRonNuke" class="gy-subCard hidden" style="margin-top:10px;">
+        <div style="font-weight:800; margin-bottom:6px;">相手が抜け番</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonNeed_nuke">-</span>
+            <span style="font-size:12px; opacity:.7;"></span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonMeBefore_nuke">-</span> → <span id="gyRonMeAfter_nuke">-</span>
+            <span id="gyRonMeDelta_nuke" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel"><span id="gyRonTopName">TOP</span>：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonTopBefore_nuke">-</span> → <span id="gyRonTopAfter_nuke">-</span>
+            <span id="gyRonTopDelta_nuke" class="gy-delta">（±0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel"><span id="gyRonOther1Name">その他①</span>：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonOther1Before">-</span> → <span id="gyRonOther1After">-</span>
+            <span id="gyRonOther1Delta" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel"><span id="gyRonOther2Name">その他②</span>：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonOther2Before">-</span> → <span id="gyRonOther2After">-</span>
+            <span id="gyRonOther2Delta" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ツモ -->
+    <div class="gs-card">
+      <div style="font-weight:900; margin-bottom:6px;">ツモの場合</div>
+
+      <!-- 自分=子のとき：相手が親の場合 -->
+      <div id="gyTsumoVsParent" class="gy-subCard hidden">
+        <div style="font-weight:800; margin-bottom:6px;">相手が親の場合</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue"><span id="gyTsumoNeed_vsParent">-</span></div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoMeBefore_vsParent">-</span> → <span id="gyTsumoMeAfter_vsParent">-</span>
+            <span id="gyTsumoMeDelta_vsParent" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">トップ：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoTopBefore_vsParent">-</span> → <span id="gyTsumoTopAfter_vsParent">-</span>
+            <span id="gyTsumoTopDelta_vsParent" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 自分=子のとき：相手が子の場合 / 自分=親のとき：このブロックだけ表示 -->
+      <div id="gyTsumoVsChild" class="gy-subCard">
+        <div style="font-weight:800; margin-bottom:6px;">相手が子の場合</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue"><span id="gyTsumoNeed_vsChild">-</span></div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoMeBefore_vsChild">-</span> → <span id="gyTsumoMeAfter_vsChild">-</span>
+            <span id="gyTsumoMeDelta_vsChild" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">トップ：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoTopBefore_vsChild">-</span> → <span id="gyTsumoTopAfter_vsChild">-</span>
+            <span id="gyTsumoTopDelta_vsChild" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3麻4人回し：抜け番（必要なら表示） -->
+      <div id="gyTsumoNuke" class="gy-subCard hidden">
+        <div style="font-weight:800; margin-bottom:6px;">相手が抜け番</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue"><span id="gyTsumoNeed_nuke">-</span></div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoMeBefore_nuke">-</span> → <span id="gyTsumoMeAfter_nuke">-</span>
+            <span id="gyTsumoMeDelta_nuke" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">トップ：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoTopBefore_nuke">-</span> → <span id="gyTsumoTopAfter_nuke">-</span>
+            <span id="gyTsumoTopDelta_nuke" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /ツモカード -->
+
+  </div><!-- /ts-body -->
+</div><!-- /gyakuSheet -->
+
+
+
 
 <!-- =========================
      履歴（縦スクロール）
@@ -462,6 +672,8 @@ const receiveOverlay  = document.getElementById("receiveOverlay");
 const historySheet    = document.getElementById("historySheet");
 const historyOverlay  = document.getElementById("historyOverlay");
 const historyList     = document.getElementById("historyList");
+const gyakuSheet    = document.getElementById("gyakuSheet");
+const gyakuOverlay  = document.getElementById("gyakuOverlay");
 
 const APP_STATE_KEY = "mahjong_app_state";
 
@@ -480,6 +692,14 @@ let currentGameInfo = {
 let isSpectatorMode = false;
 let calcUnsub = null;
 let transferUnsub = null;
+// ★追加：stopAllSubscriptions から参照されるので上の方で宣言しておく
+let endUnsub = null;
+let statusUnsub = null;   // stopAllSubscriptionsで触ってるならこれも同様に上へ
+let gameStateUnsub = null; // 同様
+let roomsUnsub = null;     // 同様
+let entryPlayersUnsub = null; // 同様
+let historyUnsub = null;   // 同様
+let gyakuUnsub = null;     // 同様
 
 // プルダウン用
 let entryPlayers = {};
@@ -713,8 +933,6 @@ function loadRooms() {
 
 // ===== ルーム一覧リアルタイム購読 =====
 let roomsCache = {};
-let roomsUnsub = null;
-let entryPlayersUnsub = null;
 
 function subscribeRooms() {
   const ref = db.ref("rooms");
@@ -1255,7 +1473,6 @@ function addPlayer() {
 // ===============================
 // 対局中 画面用（一時状態）
 // ===============================
-let gameStateUnsub = null;
 
 let selectedRecipient = null; // 'N'|'W'|'S'
 let sendAmountValue = 0;
@@ -1331,8 +1548,6 @@ function openGameScreen() {
   subscribeRoomStatus();
   
 }
-
-let statusUnsub = null;
 
 function subscribeRoomStatus() {
   if (!currentRoomId) return;
@@ -1575,7 +1790,6 @@ async function checkReceive(){
 }
 
 
-let historyUnsub = null;
 let historyCache = []; // 表示用（昇順）
 
 function subscribeHistory(){
@@ -2024,6 +2238,618 @@ async function loadHistoryOnce(){
 
   renderHistoryList(ep);
 }
+
+// ===============================
+// 逆転条件（Bottom Sheet）
+// ===============================
+let gyakuLatestPlayers = null;
+let gyakuLatestEntryPlayers = null;
+
+// 023: 自分が 親/子
+let gyakuSelfRole = null; // "parent" | "child"
+
+// 役表示（表の順）
+const GY_LABELS = ["1役","2役","3役","満貫","跳満","倍満","3倍満","役満","ダブル役満"];
+
+// 直撃点数表示変換表（画像に合わせる）
+const RON_TABLE_PARENT = [
+  { min:0,     max:3000,   point:1500,  label:GY_LABELS[0] }, // 1役
+  { min:3000,  max:6000,   point:3000,  label:GY_LABELS[1] }, // 2役
+  { min:6000,  max:12000,  point:6000,  label:GY_LABELS[2] }, // 3役
+  { min:12000, max:24000,  point:12000, label:GY_LABELS[3] }, // 満貫
+  { min:24000, max:36000,  point:18000, label:GY_LABELS[4] }, // 跳満
+  { min:36000, max:48000,  point:24000, label:GY_LABELS[5] }, // 倍満
+  { min:48000, max:72000,  point:36000, label:GY_LABELS[6] }, // 3倍満
+  { min:72000, max:96000,  point:48000, label:GY_LABELS[7] }, // 役満
+  { min:96000, max:192000, point:96000, label:GY_LABELS[8] }, // ダブル役満
+];
+
+const RON_TABLE_CHILD = [
+  { min:0,     max:2000,   point:1000,  label:GY_LABELS[0] },
+  { min:2000,  max:4000,   point:2000,  label:GY_LABELS[1] },
+  { min:4000,  max:8000,   point:4000,  label:GY_LABELS[2] },
+  { min:8000,  max:16000,  point:8000,  label:GY_LABELS[3] },
+  { min:16000, max:24000,  point:12000, label:GY_LABELS[4] },
+  { min:24000, max:32000,  point:16000, label:GY_LABELS[5] },
+  { min:32000, max:48000,  point:24000, label:GY_LABELS[6] },
+  { min:48000, max:64000,  point:32000, label:GY_LABELS[7] },
+  { min:64000, max:128000, point:64000, label:GY_LABELS[8] },
+];
+
+// 直撃点表示変換表（画像の表）
+// selfRole: "parent" or "child"
+const GY_RON_TABLE = {
+  parent: [
+    { min: 0,     max: 3000,   point: 1500 },
+    { min: 3000,  max: 6000,   point: 3000 },
+    { min: 6000,  max: 12000,  point: 6000 },
+    { min: 12000, max: 24000,  point: 12000 },
+    { min: 24000, max: 36000,  point: 18000 },
+    { min: 36000, max: 48000,  point: 24000 },
+    { min: 48000, max: 72000,  point: 36000 },
+    { min: 72000, max: 96000,  point: 48000 },
+    { min: 96000, max: 192000, point: 96000 },
+  ],
+  child: [
+    { min: 0,     max: 2000,   point: 1000 },
+    { min: 2000,  max: 4000,   point: 2000 },
+    { min: 4000,  max: 8000,   point: 4000 },
+    { min: 8000,  max: 16000,  point: 8000 },
+    { min: 16000, max: 24000,  point: 12000 },
+    { min: 24000, max: 32000,  point: 16000 },
+    { min: 32000, max: 48000,  point: 24000 },
+    { min: 48000, max: 64000,  point: 32000 },
+    { min: 64000, max: 128000, point: 64000 },
+  ],
+};
+
+
+// ツモ：必要な「自分の増分(selfGain)」と「トップの減分(topLoss)」を分ける
+// row = {min,max,selfGain,topLoss,label}
+const TSUMO_TABLES = {
+  "4": {
+    // 自分=親 / 相手(トップ)=子
+    parent_vs_child: [
+      { min:0,     max:2000,   selfGain:1500, topLoss:500,  label:GY_LABELS[0] },
+      { min:2000,  max:4000,   selfGain:3000, topLoss:1000, label:GY_LABELS[1] },
+      { min:4000,  max:8000,   selfGain:6000, topLoss:2000, label:GY_LABELS[2] },
+      { min:8000,  max:16000,  selfGain:12000,topLoss:4000, label:GY_LABELS[3] },
+      { min:16000, max:24000,  selfGain:18000,topLoss:6000, label:GY_LABELS[4] },
+      { min:24000, max:32000,  selfGain:24000,topLoss:8000, label:GY_LABELS[5] },
+      { min:32000, max:48000,  selfGain:36000,topLoss:12000,label:GY_LABELS[6] },
+      { min:48000, max:64000,  selfGain:48000,topLoss:16000,label:GY_LABELS[7] },
+      { min:64000, max:128000, selfGain:96000,topLoss:32000,label:GY_LABELS[8] },
+    ],
+    // 自分=子 / 相手(トップ)=親
+    child_vs_parent: [
+      { min:0,     max:1600,   selfGain:1100, topLoss:500,  label:GY_LABELS[0] },
+      { min:1600,  max:3000,   selfGain:2000, topLoss:1000, label:GY_LABELS[1] },
+      { min:3000,  max:6000,   selfGain:4000, topLoss:2000, label:GY_LABELS[2] },
+      { min:6000,  max:12000,  selfGain:8000, topLoss:4000, label:GY_LABELS[3] },
+      { min:12000, max:18000,  selfGain:12000,topLoss:6000, label:GY_LABELS[4] },
+      { min:18000, max:24000,  selfGain:16000,topLoss:8000, label:GY_LABELS[5] },
+      { min:24000, max:36000,  selfGain:24000,topLoss:12000,label:GY_LABELS[6] },
+      { min:36000, max:54000,  selfGain:32000,topLoss:16000,label:GY_LABELS[7] },
+      { min:54000, max:96000,  selfGain:64000,topLoss:32000,label:GY_LABELS[8] },
+    ],
+    // 自分=子 / 相手(トップ)=子
+    child_vs_child: [
+      { min:0,     max:1400,   selfGain:1000, topLoss:300,  label:GY_LABELS[0] },
+      { min:1400,  max:2500,   selfGain:2000, topLoss:500,  label:GY_LABELS[1] },
+      { min:2500,  max:5000,   selfGain:4000, topLoss:1000, label:GY_LABELS[2] },
+      { min:5000,  max:10000,  selfGain:8000, topLoss:2000, label:GY_LABELS[3] },
+      { min:10000, max:15000,  selfGain:12000,topLoss:3000, label:GY_LABELS[4] },
+      { min:15000, max:20000,  selfGain:16000,topLoss:4000, label:GY_LABELS[5] },
+      { min:20000, max:30000,  selfGain:24000,topLoss:6000, label:GY_LABELS[6] },
+      { min:30000, max:45000,  selfGain:32000,topLoss:9000, label:GY_LABELS[7] },
+      { min:45000, max:80000,  selfGain:64000,topLoss:16000,label:GY_LABELS[8] },
+    ],
+  },
+
+  "3": {
+    // 自分=親 / 相手(トップ)=子
+    parent_vs_child: [
+      { min:0,     max:2400,   selfGain:1600, topLoss:800,  label:GY_LABELS[0] },
+      { min:2400,  max:4500,   selfGain:3000, topLoss:1500, label:GY_LABELS[1] },
+      { min:4500,  max:9000,   selfGain:6000, topLoss:3000, label:GY_LABELS[2] },
+      { min:9000,  max:18000,  selfGain:12000,topLoss:6000, label:GY_LABELS[3] },
+      { min:18000, max:27000,  selfGain:18000,topLoss:9000, label:GY_LABELS[4] },
+      { min:27000, max:36000,  selfGain:24000,topLoss:12000,label:GY_LABELS[5] },
+      { min:36000, max:54000,  selfGain:36000,topLoss:18000,label:GY_LABELS[6] },
+      { min:54000, max:72000,  selfGain:48000,topLoss:24000,label:GY_LABELS[7] },
+      { min:72000, max:144000, selfGain:96000,topLoss:48000,label:GY_LABELS[8] },
+    ],
+    // 自分=子 / 相手(トップ)=親
+    child_vs_parent: [
+      { min:0,     max:1900,   selfGain:1100, topLoss:700,  label:GY_LABELS[0] },
+      { min:1900,  max:3400,   selfGain:2000, topLoss:1300, label:GY_LABELS[1] },
+      { min:3400,  max:6500,   selfGain:4000, topLoss:2500, label:GY_LABELS[2] },
+      { min:6500,  max:13000,  selfGain:8000, topLoss:5000, label:GY_LABELS[3] },
+      { min:13000, max:19500,  selfGain:12000,topLoss:7500, label:GY_LABELS[4] },
+      { min:19500, max:26000,  selfGain:16000,topLoss:10000,label:GY_LABELS[5] },
+      { min:26000, max:39000,  selfGain:24000,topLoss:15000,label:GY_LABELS[6] },
+      { min:39000, max:52000,  selfGain:32000,topLoss:20000,label:GY_LABELS[7] },
+      { min:52000, max:104000, selfGain:64000,topLoss:40000,label:GY_LABELS[8] },
+    ],
+    // 自分=子 / 相手(トップ)=子
+    child_vs_child: [
+      { min:0,     max:1700,   selfGain:1100, topLoss:500,  label:GY_LABELS[0] },
+      { min:1700,  max:2900,   selfGain:2000, topLoss:800,  label:GY_LABELS[1] },
+      { min:2900,  max:5500,   selfGain:4000, topLoss:1500, label:GY_LABELS[2] },
+      { min:5500,  max:11000,  selfGain:8000, topLoss:3000, label:GY_LABELS[3] },
+      { min:11000, max:16500,  selfGain:12000,topLoss:4500, label:GY_LABELS[4] },
+      { min:16500, max:22000,  selfGain:16000,topLoss:6000, label:GY_LABELS[5] },
+      { min:22000, max:33000,  selfGain:24000,topLoss:9000, label:GY_LABELS[6] },
+      { min:33000, max:44000,  selfGain:32000,topLoss:12000,label:GY_LABELS[7] },
+      { min:44000, max:88000,  selfGain:64000,topLoss:24000,label:GY_LABELS[8] },
+    ],
+  },
+
+  // 3r4 は表自体は 3 と同じ計算でまずOK（抜け番対応を入れるなら別途キー追加）
+  "3r4": null,
+};
+
+// 3r4（3麻4人回し）専用：抜け番（相手支払い0）のツモ変換表
+// 023の選択が「親」のときの抜け番列
+const TSUMO_NUKE_023_OYA = [
+  { min: 0,     max: 1600,  me: 1600  },
+  { min: 1600,  max: 3000,  me: 3000  },
+  { min: 3000,  max: 6000,  me: 6000  },
+  { min: 6000,  max: 12000, me: 12000 },
+  { min: 12000, max: 18000, me: 18000 },
+  { min: 18000, max: 24000, me: 24000 },
+  { min: 24000, max: 36000, me: 36000 },
+  { min: 36000, max: 48000, me: 48000 },
+  { min: 48000, max: 96000, me: 96000 },
+];
+
+// 023の選択が「子」のときの抜け番列
+const TSUMO_NUKE_023_KO = [
+  { min: 0,     max: 1100,  me: 1100  },
+  { min: 1100,  max: 2000,  me: 2000  },
+  { min: 2000,  max: 4000,  me: 4000  },
+  { min: 4000,  max: 8000,  me: 8000  },
+  { min: 8000,  max: 12000, me: 12000 },
+  { min: 12000, max: 16000, me: 16000 },
+  { min: 16000, max: 24000, me: 24000 },
+  { min: 24000, max: 32000, me: 32000 },
+  { min: 32000, max: 64000, me: 64000 },
+];
+
+// label 付与（★必ず両方の const の後）
+[TSUMO_NUKE_023_OYA, TSUMO_NUKE_023_KO].forEach(tbl => {
+  tbl.forEach((r, i) => { r.label = GY_LABELS[i]; });
+});
+
+function formatNeed(label, point){
+  const p = Number(point || 0);
+  if (!label) return String(p);
+  return `${label}(${p})`;
+}
+
+function lookupRonPoint(diffAbs, selfRole) {
+  const rows = GY_RON_TABLE[selfRole] || GY_RON_TABLE.child;
+  for (const r of rows) {
+    // 表の条件：min <= diff < max
+    if (diffAbs >= r.min && diffAbs < r.max) return r.point;
+  }
+  // 範囲外は最後のpoint扱い（保険）
+  return rows[rows.length - 1].point;
+}
+
+function lookupRonRow(diffAbs, selfRole) {
+  const rows = (selfRole === "parent") ? RON_TABLE_PARENT : RON_TABLE_CHILD;
+  for (const r of rows) {
+    if (diffAbs >= r.min && diffAbs < r.max) return r; // {point,label}
+  }
+  return rows[rows.length - 1];
+}
+
+function setText(id, v){
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(v);
+}
+
+function showEl(id, show){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("hidden", !show);
+}
+
+// 抜け番（3麻4人回し）の「直撃（ロン）」表示
+// 前提：players は {pid: {name, point}} みたいな構造を想定
+function renderRonNuke_3r4({
+  rule,
+  selfRole,     // "parent" or "child"
+  mePid,
+  topPid,
+  diffAbs,      // |topPoint - mePoint|
+  players
+}){
+  const enable = (rule === "3r4");
+  showEl("gyRonNuke", enable);
+  if (!enable) return;
+
+  // トップ以外＆自分以外の2人
+  const otherPids = Object.keys(players || {})
+    .filter(pid => pid !== mePid && pid !== topPid)
+    .slice(0, 2);
+
+  // 万一2人取れないケースは非表示
+  if (otherPids.length < 2) {
+    showEl("gyRonNuke", false);
+    return;
+  }
+
+  const me  = players[mePid];
+  const top = players[topPid];
+  const o1  = players[otherPids[0]];
+  const o2  = players[otherPids[1]];
+
+  // 通常直撃の必要点（表のpoint列: 1500/3000/... or 1000/2000/...）
+  const baseRow  = lookupRonRow(diffAbs * 2, selfRole);
+  const baseNeed = baseRow.point;
+
+  // ★黄色列（トップ以外 point）は通常直撃(point)の2倍
+  const nukeNeed = baseNeed;
+
+  // ★抜け番ロン：トップは±0、トップ以外2人がそれぞれ nukeNeed を支払う
+  const payEach = nukeNeed;
+
+  const meBefore  = Number(me?.point ?? 0);
+  const topBefore = Number(top?.point ?? 0);
+  const o1Before  = Number(o1?.point ?? 0);
+  const o2Before  = Number(o2?.point ?? 0);
+
+  const meAfter  = meBefore + payEach;
+  const topAfter = topBefore;              // トップは±0
+  const o1After  = o1Before - payEach;
+  const o2After  = o2Before - payEach;
+
+  // 表示（必要点は黄色列の値を出す）
+  setText("gyRonNeed_nuke", diffAbs ? formatNeed(baseRow.label, nukeNeed) : "-");
+
+  setText("gyRonMeBefore_nuke", diffAbs ? meBefore : "-");
+  setText("gyRonMeAfter_nuke",  diffAbs ? meAfter : "-");
+  setText("gyRonMeDelta_nuke",  diffAbs ? `（+${payEach}）` : "-");
+
+  setText("gyRonTopName", diffAbs ? `${top?.name}` ?? "TOP" : "-");
+  setText("gyRonTopBefore_nuke", diffAbs ? topBefore : "-");
+  setText("gyRonTopAfter_nuke",  diffAbs ? topAfter : "-");
+  setText("gyRonTopDelta_nuke",  diffAbs ? "（±0）" : "-");
+
+  setText("gyRonOther1Name", o1?.name ?? "その他①");
+  setText("gyRonOther2Name", o2?.name ?? "その他②");
+
+  setText("gyRonOther1Before", diffAbs ? o1Before : "-");
+  setText("gyRonOther1After",  diffAbs ? o1After : "-");
+  setText("gyRonOther1Delta",  diffAbs ? `（-${payEach}）` : "-");
+
+  setText("gyRonOther2Before", diffAbs ? o2Before : "-");
+  setText("gyRonOther2After",  diffAbs ? o2After : "-");
+  setText("gyRonOther2Delta",  diffAbs ? `（-${payEach}）` : "-");
+}
+
+
+
+
+function lookupNuke(diff, is023OyaSelected){
+  const table = is023OyaSelected ? TSUMO_NUKE_023_OYA : TSUMO_NUKE_023_KO;
+  const row = table.find(r => diff >= r.min && diff < r.max) || table[table.length - 1];
+  return { label: row.label, me: row.me, opp: 0 };
+}
+
+
+function isParentByDirection(dir){
+  return dir === "東";
+}
+
+function findNeedRow(diff, table){
+  const d = Math.max(0, Number(diff || 0));
+  for (const r of table){
+    if (d >= r.min && d < r.max) return r;
+  }
+  return table[table.length - 1];
+}
+
+function findNeed(diff, table){
+  const d = Math.max(0, Number(diff || 0));
+  for (const r of table){
+    if (d >= r.min && d < r.max) return r;
+  }
+  // 上限超えは最後の行
+  return table[table.length - 1];
+}
+
+function getMyRoleDefault(){
+  // 既定：自分の direction が 東 なら親、それ以外は子
+  return (currentGameInfo?.direction === "東") ? "parent" : "child";
+}
+
+function setGyakuRadio(role){
+  const rs = document.querySelectorAll('input[name="gySelfRole"]');
+  rs.forEach(r => r.checked = (r.value === role));
+}
+
+function hookGyakuRadioOnce(){
+  const rs = document.querySelectorAll('input[name="gySelfRole"]');
+  rs.forEach(r => {
+    // 何回openしても二重登録しにくいように一度消す（簡易）
+    r.onchange = null;
+    r.onchange = () => {
+      gyakuSelfRole = r.value;
+      if (gyakuLatestPlayers && gyakuLatestEntryPlayers) {
+        renderGyakuSheet(gyakuLatestPlayers, gyakuLatestEntryPlayers);
+      }
+    };
+  });
+}
+
+// 逆転
+function openGyakuSheet(){
+  if (isSpectatorMode) return; // 観戦は不可にするなら（必要なら外してOK）
+
+  gyakuOverlay.classList.remove("hidden");
+  gyakuSheet.classList.remove("hidden");
+  requestAnimationFrame(() => gyakuSheet.classList.add("is-open"));
+
+  // 初回だけデフォルトセット
+  if (!gyakuSelfRole) gyakuSelfRole = getMyRoleDefault();
+  setGyakuRadio(gyakuSelfRole);
+  hookGyakuRadioOnce();
+
+  subscribeGyakuSheet();
+}
+
+// 逆転
+function closeGyakuSheet(){
+  gyakuSheet.classList.remove("is-open");
+  gyakuOverlay.classList.add("hidden");
+  setTimeout(() => gyakuSheet.classList.add("hidden"), 230);
+
+  if (gyakuUnsub) { gyakuUnsub(); gyakuUnsub = null; }
+}
+
+// 逆転
+function subscribeGyakuSheet(){
+  if (!currentRoomId) return;
+
+  // 既存解除
+  if (gyakuUnsub) gyakuUnsub();
+
+  const playersRef = db.ref(`rooms/${currentRoomId}/players`);
+  const entryRef   = db.ref(`systemConfig/entryPlayers`);
+
+  const handler = async () => {
+    const [pSnap, eSnap] = await Promise.all([
+      playersRef.once("value"),
+      entryRef.once("value"),
+    ]);
+    gyakuLatestPlayers = pSnap.val() || {};
+    gyakuLatestEntryPlayers = eSnap.val() || {};
+    renderGyakuSheet(gyakuLatestPlayers, gyakuLatestEntryPlayers);
+  };
+
+  playersRef.on("value", handler);
+  gyakuUnsub = () => playersRef.off("value", handler);
+
+  handler();
+  document.getElementById("gyakuBody")?.scrollTo({ top: 0 });
+}
+
+// 逆転
+function renderGyakuSheet(players, entryPlayers){
+  const myPid = currentGameInfo?.playerId;
+  if (!myPid || !players?.[myPid]) return;
+
+  const myPoint = Number(players[myPid]?.point ?? 0);
+
+  // トップ（参加者の最大point）
+  let topPid = myPid;
+  let topPoint = myPoint;
+  for (const [pid, p] of Object.entries(players || {})){
+    if (!p?.direction) continue;
+    const pt = Number(p.point ?? 0);
+    if (pt > topPoint){
+      topPoint = pt;
+      topPid = pid;
+    }
+  }
+
+  // 差分（トップ - 自分）
+  const diffRaw = Number(topPoint - myPoint);
+  const diff = Math.max(0, diffRaw);
+
+  // 023: 自分の立場（ラジオから直接拾う）
+  const selfRole = document.querySelector('input[name="gySelfRole"]:checked')?.value || "child";
+  gyakuSelfRole = selfRole; // 既存ロジックとも整合させる（保険）
+  const isSelfParent = (selfRole === "parent");
+
+  // ---------- 直撃（ロン） ----------
+  const ronRow = (topPid === myPid)
+    ? { point: 0, label: "トップ" }
+    : findNeed(diff, isSelfParent ? RON_TABLE_PARENT : RON_TABLE_CHILD);
+
+  // 差分表示（役名 + 点数）
+  setText("gyName", `${String(entryPlayers[topPid].name)}（${topPoint}）`);
+  setText("gyMyName", `${String(entryPlayers[myPid].name)}（${myPoint}）`);
+  setText("gyDiff", String(diff*-1));
+
+
+  // 直撃表示
+  const ronP = Number(ronRow.point ?? 0);
+  setText("gyRonNeed", diff ? formatNeed(ronRow?.label, ronP) : "-");
+
+  setText("gyRonMeBefore", diff ? String(myPoint) : "-");
+  setText("gyRonMeAfter",  diff ? String(myPoint + ronP) : "-");
+  setText("gyRonMeDelta",  diff ? `（+${ronP}）` : "-");
+
+  setText("gyRonTopBefore", diff ? String(topPoint) : "-");
+  setText("gyRonTopAfter",  diff ? String(topPoint - ronP) : "-");
+  setText("gyRonTopDelta",  diff ? `（-${ronP}）` : "-");
+
+  // ---------- ★3麻4人回し：抜け番（ロン）を再計算して描画 ----------
+  // renderRonNuke_3r4 は players[pid].name を参照するので、name付きのmapを作って渡す
+  const playersForRonNuke = {};
+  for (const [pid, p] of Object.entries(players || {})) {
+    if (!p?.direction) continue; // 参加者のみ（観戦や空席を除外）
+    playersForRonNuke[pid] = {
+      name: entryPlayers?.[pid]?.name ?? pid,
+      point: Number(p.point ?? 0),
+    };
+  }
+
+  renderRonNuke_3r4({
+    rule: currentRule,                      // rooms/{roomId}/gameConfig/rule を currentRule に入れてる前提
+    selfRole,                               // "parent" or "child"
+    mePid: myPid,
+    topPid,
+    diffAbs: Math.abs(topPoint - myPoint),  // diffでもOK
+    players: playersForRonNuke
+  });
+
+
+  // ---------- ツモ（2パターン） ----------
+  if (topPid === myPid) {
+    renderGyakuTsumoBlocks(selfRole,
+      { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" },
+      { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" }
+    );
+    renderGyakuNuke(false, diff, selfRole, myPoint, topPoint); // 3r4以外は隠す
+    return;
+  }
+
+  const ruleKey = (currentRule === "3r4") ? "3" : String(currentRule || "3");
+  const tables = TSUMO_TABLES[ruleKey];
+  if (!tables) {
+    renderGyakuTsumoBlocks(selfRole,
+      { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" },
+      { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" }
+    );
+    renderGyakuNuke(false, diff, selfRole, myPoint, topPoint);
+    return;
+  }
+
+  let patVsParent = null;
+  let patVsChild  = null;
+
+  if (selfRole === "parent") {
+    // 自分=親：相手(トップ)は子パターンのみ
+    const row = findNeedRow(diff, tables.parent_vs_child);
+    patVsChild = {
+      need: `${row.label}（+${row.selfGain} / トップ-${row.topLoss}）`,
+      meBefore: String(myPoint),
+      meAfter:  String(myPoint + row.selfGain),
+      meDelta:  `（+${row.selfGain}）`,
+      topBefore:String(topPoint),
+      topAfter: String(topPoint - row.topLoss),
+      topDelta: `（-${row.topLoss}）`,
+    };
+  } else {
+    // 自分=子：相手が親/子でテーブルを変える（両方出す）
+    const rowParent = findNeedRow(diff, tables.child_vs_parent);
+    const rowChild  = findNeedRow(diff, tables.child_vs_child);
+
+    patVsParent = {
+      need: `${rowParent.label}（+${rowParent.selfGain} / トップ-${rowParent.topLoss}）`,
+      meBefore: String(myPoint),
+      meAfter:  String(myPoint + rowParent.selfGain),
+      meDelta:  `（+${rowParent.selfGain}）`,
+      topBefore:String(topPoint),
+      topAfter: String(topPoint - rowParent.topLoss),
+      topDelta: `（-${rowParent.topLoss}）`,
+    };
+    patVsChild = {
+      need: `${rowChild.label}（+${rowChild.selfGain} / トップ-${rowChild.topLoss}）`,
+      meBefore: String(myPoint),
+      meAfter:  String(myPoint + rowChild.selfGain),
+      meDelta:  `（+${rowChild.selfGain}）`,
+      topBefore:String(topPoint),
+      topAfter: String(topPoint - rowChild.topLoss),
+      topDelta: `（-${rowChild.topLoss}）`,
+    };
+  }
+
+
+
+  renderGyakuTsumoBlocks(selfRole, patVsParent, patVsChild);
+
+  // 3r4 抜け番（必要なら表示）
+  renderGyakuNuke(currentRule === "3r4", diff, selfRole, myPoint, topPoint);
+}
+
+
+
+// 逆転
+function renderGyakuTsumoBlocks(selfRole, patVsParent, patVsChild) {
+  const boxParent = document.getElementById("gyTsumoVsParent");
+  const boxChild  = document.getElementById("gyTsumoVsChild");
+
+  if (selfRole === "parent") {
+    boxParent?.classList.add("hidden");
+    boxChild?.classList.remove("hidden");
+
+    setText("gyTsumoNeed_vsChild", patVsChild?.need ?? "-");
+    setText("gyTsumoMeBefore_vsChild", patVsChild?.meBefore ?? "-");
+    setText("gyTsumoMeAfter_vsChild",  patVsChild?.meAfter ?? "-");
+    setText("gyTsumoMeDelta_vsChild",  patVsChild?.meDelta ?? "（+0）");
+
+    setText("gyTsumoTopBefore_vsChild",patVsChild?.topBefore ?? "-");
+    setText("gyTsumoTopAfter_vsChild", patVsChild?.topAfter ?? "-");
+    setText("gyTsumoTopDelta_vsChild", patVsChild?.topDelta ?? "（-0）");
+    return;
+  }
+
+  // 自分=子：親/子の2パターン表示
+  boxParent?.classList.remove("hidden");
+  boxChild?.classList.remove("hidden");
+
+  // vs 親
+  setText("gyTsumoNeed_vsParent", patVsParent?.need ?? "-");
+  setText("gyTsumoMeBefore_vsParent", patVsParent?.meBefore ?? "-");
+  setText("gyTsumoMeAfter_vsParent",  patVsParent?.meAfter ?? "-");
+  setText("gyTsumoMeDelta_vsParent",  patVsParent?.meDelta ?? "（+0）");
+
+  setText("gyTsumoTopBefore_vsParent",patVsParent?.topBefore ?? "-");
+  setText("gyTsumoTopAfter_vsParent", patVsParent?.topAfter ?? "-");
+  setText("gyTsumoTopDelta_vsParent", patVsParent?.topDelta ?? "（-0）");
+
+  // vs 子
+  setText("gyTsumoNeed_vsChild", patVsChild?.need ?? "-");
+  setText("gyTsumoMeBefore_vsChild", patVsChild?.meBefore ?? "-");
+  setText("gyTsumoMeAfter_vsChild",  patVsChild?.meAfter ?? "-");
+  setText("gyTsumoMeDelta_vsChild",  patVsChild?.meDelta ?? "（+0）");
+
+  setText("gyTsumoTopBefore_vsChild",patVsChild?.topBefore ?? "-");
+  setText("gyTsumoTopAfter_vsChild", patVsChild?.topAfter ?? "-");
+  setText("gyTsumoTopDelta_vsChild", patVsChild?.topDelta ?? "（-0）");
+}
+
+function renderGyakuNuke(enabled, diff, selfRole, myPoint, topPoint){
+  const box = document.getElementById("gyTsumoNuke");
+  if (!box) return;
+
+  if (!enabled) {
+    box.classList.add("hidden");
+    return;
+  }
+
+  box.classList.remove("hidden");
+
+  const is023OyaSelected = (selfRole === "parent");
+  const nuke = lookupNuke(diff, is023OyaSelected); // { me: xxx, opp:0 }
+
+  setText("gyTsumoNeed_nuke", `${nuke.label}（+${nuke.me} / トップ-0）`);
+
+  setText("gyTsumoMeBefore_nuke", String(myPoint));
+  setText("gyTsumoMeAfter_nuke",  String(myPoint + Number(nuke.me)));
+  setText("gyTsumoMeDelta_nuke",  `（+${nuke.me}）`);
+
+  setText("gyTsumoTopBefore_nuke", String(topPoint));
+  setText("gyTsumoTopAfter_nuke",  String(topPoint)); // トップ減らない
+  setText("gyTsumoTopDelta_nuke",  `（-0）`);
+}
+
 
 // 履歴シート 表示
 async function openHistorySheet(){
@@ -2520,8 +3346,6 @@ async function checkAllEndAndClose(players, gameConfig) {
 // ===============================
 // 対局終了画面：リアルタイム購読
 // ===============================
-let endUnsub = null;
-
 function openEndScreen() {
   // 画面切替
   loginScreen?.classList.add("hidden");
@@ -2636,14 +3460,25 @@ function renderEndScreen(players, gameConfig, entryPlayers) {
 
 // 画面離脱時は購読解除
 function stopAllSubscriptions() {
-  if (roomsUnsub) roomsUnsub();
-  if (entryPlayersUnsub) entryPlayersUnsub(); // ★追加
-  if (gameStateUnsub) gameStateUnsub();
-  if (calcUnsub) calcUnsub();
-  if (endUnsub) endUnsub();
-  if (transferUnsub) transferUnsub();
-  if (historyUnsub) historyUnsub();
+  const safelyOff = (fnName) => {
+    try {
+      const fn = window[fnName];
+      if (typeof fn === "function") fn();
+    } catch {}
+  };
+
+  // 変数型unsubscribeの典型（ローカル変数）
+  if (roomsUnsub) { roomsUnsub(); roomsUnsub = null; }
+  if (entryPlayersUnsub) { entryPlayersUnsub(); entryPlayersUnsub = null; }
+  if (gameStateUnsub) { gameStateUnsub(); gameStateUnsub = null; }
+  if (transferUnsub) { transferUnsub(); transferUnsub = null; }
+  if (historyUnsub) { historyUnsub(); historyUnsub = null; }
+  if (calcUnsub) { calcUnsub(); calcUnsub = null; }
+  if (endUnsub) { endUnsub(); endUnsub = null; }
+  if (statusUnsub) { statusUnsub(); statusUnsub = null; }
+  if (gyakuUnsub) { gyakuUnsub(); gyakuUnsub = null; }
 }
+
 
 
 // ------------------- DB削除 -------------------

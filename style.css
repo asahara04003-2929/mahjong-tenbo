@@ -22,9 +22,7 @@
     align-items: center;
   }
   .ts-sheet{
-
     left: 0;
-
   }
 }
 
@@ -44,6 +42,9 @@
     grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
     gap: 10px;
     align-items: center;
+  }
+  .ts-body{
+    max-height: calc(var(--vh) * 100 - 90px);
   }
 }
 
@@ -208,7 +209,7 @@ body{
 }
 
 #btnRiichiAdd{
-  min-width:120px;
+  min-width:100px;
 }
 
 /* 横向き：左 卓 / 右 操作 */
@@ -399,7 +400,6 @@ body{
 
 .ts-sheet{
   position: fixed;
-
   right: 0;
   bottom: 0;
   z-index: 1000;
@@ -411,6 +411,51 @@ body{
 
   transform: translateY(105%);
   transition: transform 220ms ease;
+}
+
+/* ===== Bottom Sheet：中身だけスクロールさせる ===== */
+.ts-sheet{
+  /* 画面からはみ出さないように上限を付ける */
+  max-height: calc(var(--vh) * 100);
+  overflow: hidden; /* ←シート外へはみ出させない */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ハンドル/ヘッダーは固定で、ボディだけスクロール */
+.ts-body{
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* ヘッダー分を引いた高さ＝「見えてる範囲」でスクロール */
+  max-height: calc(var(--vh) * 100 - 110px);
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+/* 逆転条件：ツモの2パターン表示用 */
+.gy-subCard{
+  border: 2px solid #222;
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 10px;
+  background: #fff;
+}
+
+.tsumo-nuke{
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #ccc;
+  opacity: 0.9;
+}
+
+/* 逆転条件：増減（括弧） */
+.gy-delta{
+  font-size: 12px;
+  margin-left: 6px;
+  opacity: .9;
+}
+.gy-delta.negative{
+  color:#c00;
+  font-weight:700;
 }
 
 /* 表示状態 */
@@ -544,6 +589,13 @@ body{
 }
 .gs-cardLabel{ font-size:12px; opacity:.85; width:70px; }
 .gs-cardValue{ font-size:16px; font-weight:900; }
+
+.gs-row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:8px;
+}
 
 /* ===== 履歴 ===== */
 .historyList{
