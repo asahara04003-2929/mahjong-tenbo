@@ -217,7 +217,7 @@ select { margin-left:6px; }
 
 
 <!-- =========================
-     送金ボトムシート（下からせり出し）
+     支払ボトムシート（下からせり出し）
 ========================= -->
 <div id="transferOverlay" class="ts-overlay hidden" onclick="closeTransferSheet()"></div>
 
@@ -225,11 +225,11 @@ select { margin-left:6px; }
   <div class="ts-handle"></div>
 
   <div class="ts-header">
-    <div class="ts-title">送金</div>
-    <button class="ts-close" onclick="closeTransferSheet()">×</button>
+    <div class="ts-title">支払</div>
+    <button class="ts-close" onclick="closeTransferSheet()">✕</button>
   </div>
 
-  <!-- 送金状況（元の赤枠の上部） -->
+  <!-- 支払状況（元の赤枠の上部） -->
   <div class="gs-card">
     <div class="gs-cardRow">
       <div class="gs-cardLabel">支払先：</div>
@@ -248,7 +248,7 @@ select { margin-left:6px; }
     <button class="gs-btn" onclick="addAmount(100)">100</button>
     <button class="gs-btn" onclick="addAmount(5000)">5000</button>
     <button class="gs-btn" onclick="addAmount(500)">500</button>
-    <button class="gs-btn gs-btnSub" onclick="cancelTransfer()">クリア</button>
+    <button class="gs-btn gs-btnSub" onclick="cancelAmountValue()">クリア</button>
   </div>
 
   <!-- 確定/取消 -->
@@ -1216,7 +1216,7 @@ function applySpectatorLockUI() {
     if (el) el.disabled = true;
   }
 
-  // 送金ボトムシートを開かせない（残ってたら閉じる）
+  // 支払ボトムシートを開かせない（残ってたら閉じる）
   try { closeTransferSheet(); } catch {}
 
   // 観戦中はボトムシート自体触れないように（任意）
@@ -1778,6 +1778,14 @@ function addAmount(amount){
 // ===============================
 // 017 取消：送り先/金額リセット
 // ===============================
+function cancelAmountValue(){
+  sendAmountValue = 0;
+  setText("sendAmount", "0");
+}
+
+// ===============================
+// 017 取消：送り先/金額リセット
+// ===============================
 function cancelTransfer(){
   selectedRecipient = null;
   sendAmountValue = 0;
@@ -1965,7 +1973,7 @@ function renderSpectatorUI(players, gameConfig, entryPlayers) {
   // 下=北 => yakitoriS
   setYakitoriByPid("yakitoriS", pidN);
 
-  // 観戦は席タップで送金などをさせない（毎回念押し）
+  // 観戦は席タップで支払などをさせない（毎回念押し）
   const seatEls = [
     document.querySelector(".gs-north"),
     document.querySelector(".gs-west"),

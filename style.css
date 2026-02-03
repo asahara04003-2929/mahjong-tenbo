@@ -21,6 +21,11 @@
     gap: 10px;
     align-items: center;
   }
+  .ts-sheet{
+
+    left: 0;
+
+  }
 }
 
 
@@ -280,6 +285,7 @@ body{
   border:2px solid #222;
   padding:10px;
   box-sizing:border-box;
+  margin-bottom: 10px;
 }
 
 .gs-statusRow{
@@ -306,6 +312,7 @@ body{
   display:grid;
   grid-template-columns: repeat(3, 1fr);
   gap:10px;
+  margin-bottom: 10px;
 }
 
 .gs-amtBtn{
@@ -392,7 +399,7 @@ body{
 
 .ts-sheet{
   position: fixed;
-  left: 0;
+
   right: 0;
   bottom: 0;
   z-index: 1000;
@@ -530,7 +537,7 @@ body{
 /* ===== 共通カード行（ポップアップで使用） ===== */
 .gs-cardRow{
   display:flex;
-  justify-content:space-between;
+  justify-content:flex-start;
   align-items:center;
   gap:10px;
   padding:6px 0;
