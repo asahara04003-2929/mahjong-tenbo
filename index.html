@@ -2778,23 +2778,11 @@ function refreshVH() {
   }, 600);
 }
 
-function resetViewportScale() {
-  const meta = document.querySelector('meta[name="viewport"]');
-  if (!meta) return;
-  meta.setAttribute("content", "width=device-width, initial-scale=1");
-  setTimeout(() => {
-    meta.setAttribute("content", "width=device-width, initial-scale=1.0, viewport-fit=cover");
-  }, 50);
-}
-
 // 初期化
 refreshVH();
 
 // リサイズ（既存）
-window.addEventListener("orientationchange", () => {
-  resetViewportScale();
-  refreshVH();
-}, { passive: true });
+window.addEventListener("resize", refreshVH, { passive: true });
 
 // visualViewport（既存 + scroll 追加が効くこと多い）
 if (window.visualViewport) {
@@ -2807,41 +2795,6 @@ window.addEventListener("orientationchange", refreshVH, { passive: true });
 
 // iOS Safari / PWA：復帰時にズレる対策（既存）
 window.addEventListener("pageshow", refreshVH, { passive: true });
-
-
-// 旧のソースコード
-// function setRealVH(){
-//   const vv = window.visualViewport;
-//   const baseH = (vv?.height ?? window.innerHeight);
-
-//   const isPortrait = vv ? (vv.height >= vv.width) : (window.innerHeight >= window.innerWidth);
-
-//   const adjustedH = baseH - (isPortrait ? 100 : 30);
-//   document.documentElement.style.setProperty("--vh", `${adjustedH * 0.01}px`);
-// }
-
-// // 端末が回転した直後は値が揺れることがあるので、
-// // 1回 + 次フレーム + 少し後(保険) で再計算
-// function refreshVH(){
-//   setRealVH();
-//   requestAnimationFrame(setRealVH);
-//   setTimeout(setRealVH, 200);
-// }
-
-// // 初期化
-// refreshVH();
-
-// // 既存：リサイズ
-// window.addEventListener("resize", refreshVH);
-// window.visualViewport?.addEventListener("resize", refreshVH);
-
-// // ★追加：縦横切替のたびに実行（これが目的）
-// window.addEventListener("orientationchange", refreshVH);
-
-// // （任意：iOS Safari対策）ページが戻ってきた時にも再計算
-// window.addEventListener("pageshow", refreshVH);
-
-
 
 </script>
 </body>
