@@ -849,12 +849,14 @@ async function openPlayerConfigScreen(msg) {
 
 async function completePlayerConfig() {
   const sel = document.getElementById("playerConfigSelect");
-  const pid = sel?.value;
+  let pid = sel?.value;
 
   if (!pid) {
     document.getElementById("playerConfigMsg").textContent = "プレイヤーを選択してください。";
     return;
   }
+
+  pid = String(pid).trim(); // ★念のため（空白混入対策）
 
   myDeviceId = myDeviceId || getOrCreateDeviceId();
   if (!myDeviceId) {
@@ -862,23 +864,45 @@ async function completePlayerConfig() {
     return;
   }
 
-  const ref = db.ref(`deviceMap/${myDeviceId}`);
+  try {
+    // 1) pid に一致する deviceMap/{deviceId} を全件取得
+    const snap = await db
+      .ref("deviceMap")
+      .orderByChild("playerId")
+      .equalTo(pid)
+      .once("value");
 
-  // ★常に上書き更新する（変更を許可）
-  await ref.update({
-    playerId: pid,
-    updatedAt: firebase.database.ServerValue.TIMESTAMP,
-    lastRoomId: null
-  });
+    // 2) 一致した deviceId ノードを全部削除（deviceMap/{deviceId} = null）
+    if (snap.exists()) {
+      const updates = {};
+      snap.forEach(child => {
+        const deviceId = child.key;
+        if (!deviceId) return;
+        updates[`deviceMap/${deviceId}`] = null; // ★ノード丸ごと削除
+      });
 
-  // ★アプリ内状態も更新
-  myPlayerId = pid;
+      // 重要：update対象があるときだけ叩く
+      if (Object.keys(updates).length) {
+        await db.ref().update(updates);
+      }
+    }
 
-  // ★右上表示が古いままにならないように即反映（保険）
-  try { updateMyPlayerLabel?.(); } catch {}
+    // 3) その後に登録（これで最終的に myDeviceId のみ残る）
+    await db.ref(`deviceMap/${myDeviceId}`).set({
+      playerId: pid,
+      updatedAt: Date.now(),
+      lastRoomId: null
+    });
 
-  // ルーム一覧へ
-  showRoomListScreen();
+    myPlayerId = pid;
+    try { updateMyPlayerLabel?.(); } catch {}
+    showRoomListScreen();
+
+  } catch (e) {
+    console.error("completePlayerConfig error:", e);
+    document.getElementById("playerConfigMsg").textContent =
+      `処理に失敗しました: ${e?.message || e}`;
+  }
 }
 
 
