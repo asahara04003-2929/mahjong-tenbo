@@ -1422,28 +1422,58 @@ async function enterRoom(id) {
 }
 
 // status変更判定
+// status変更判定（最後の人が押した時だけ roomStatus を playing にする）
 async function ensurePlayingOnEnter(roomId, playerId) {
   if (!roomId || !playerId) return;
 
   const playerStatusRef = db.ref(`rooms/${roomId}/players/${playerId}/status`);
   const roomStatusRef   = db.ref(`rooms/${roomId}/gameConfig/status`);
 
-  // ---- player status ----
-  const pSnap = await playerStatusRef.once("value");
-  const pStatus = pSnap.val();
+  try {
+    // 1) 自分status確認 → waiting なら playing にする
+    const pSnap = await playerStatusRef.once("value");
+    const pStatus = pSnap.val();
 
-  if (pStatus === "waiting") {
-    await playerStatusRef.set("playing");
-  }
+    let becamePlayingNow = false;
+    if (pStatus === "waiting") {
+      await playerStatusRef.set("playing");
+      becamePlayingNow = true;
+    }
 
-  // ---- room status ----
-  const rSnap = await roomStatusRef.once("value");
-  const rStatus = rSnap.val();
+    // 2) players / gameConfig / roomStatus を取得
+    const [playersSnap, configSnap, rSnap] = await Promise.all([
+      db.ref(`rooms/${roomId}/players`).once("value"),
+      db.ref(`rooms/${roomId}/gameConfig`).once("value"),
+      roomStatusRef.once("value"),
+    ]);
 
-  if (rStatus === "waiting") {
-    await roomStatusRef.set("playing");
+    const players = playersSnap.val() || {};
+    const gameConfig = configSnap.val() || {};
+    const rStatus = rSnap.val();
+
+    // 3) 参加人数（3麻/4麻）を決める
+    const need = (String(gameConfig.rule) === "3") ? 3 : 4;
+
+    // 4) 参加者のみ（directionがある人）を対象に playing 数を数える
+    const playingCount =
+      Object.values(players)
+        .filter(p => p?.direction)      // 参加者のみ
+        .filter(p => p?.status === "playing")
+        .length
+      + (becamePlayingNow ? 1 : 0);     // 今回自分が playing になった分を加算（snapが更新前の可能性があるため）
+
+    // 5) roomStatus は「最後の人が押した時だけ」 waiting → playing にする
+    if (rStatus === "waiting" && playingCount >= need) {
+      await roomStatusRef.set("playing");
+      alert("対局開始します。");
+    }
+
+  } catch (e) {
+    console.error("ensurePlayingOnEnter error:", e);
+    alert("状態更新に失敗しました。\n" + (e?.message ?? e));
   }
 }
+
 
 
 
