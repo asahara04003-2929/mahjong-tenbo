@@ -208,10 +208,6 @@ body{
   font-size:16px;
 }
 
-#btnRiichiAdd{
-  min-width:100px;
-}
-
 /* 横向き：左 卓 / 右 操作 */
 .gs-landscape{
   display:grid;
@@ -219,7 +215,6 @@ body{
   gap:10px;
   align-items:start;
 }
-
 
 
 .gs-table{
