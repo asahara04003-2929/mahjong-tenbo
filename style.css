@@ -44,10 +44,7 @@
     align-items: center;
   }
   .ts-body{
-    max-height: calc(var(--vh) * 100 - 50px);
-  }
-  .historyList{
-    max-height: calc(var(--vh) * 100 - 50px);
+    max-height: calc(var(--vh) * 100 - 90px);
   }
 }
 
@@ -597,20 +594,13 @@ body{
 
 /* ===== 履歴 ===== */
 .historyList{
+  max-height: 85vh;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-
-  /* 逆転条件(ts-body)と揃える */
-  max-height: calc(var(--vh) * 100 - 110px);
-
   display:flex;
   flex-direction:column;
   gap:10px;
-
-  /* safe-area 分も確保（ts-bodyと揃える） */
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  padding-bottom: 8px;
 }
-
 .historyItem{
   background:#fff;
   border:2px solid #222;
