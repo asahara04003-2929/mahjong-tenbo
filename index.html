@@ -1291,11 +1291,11 @@ async function createRoomFromCreateScreen() {
       returnPoint,
       rule,
       status: "waiting",
-      riichiStickCount: 0
+      riichiStickCount: 0,
+      createdAt: firebase.database.ServerValue.TIMESTAMP
     },
     players: playersObj,
-    transferRequests: {},
-    gameLogs: {}
+    transferRequests: {}
   });
 
   // 作ったら一覧へ
@@ -3083,11 +3083,21 @@ async function endGame() {
   }
 }
 
+// ================================================
+// GAS連携　スプレッドシートへデータ書き込み
+// ================================================
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyqghF0B_hau72utvGgNXu7k_n9lr0TJJEYFezIukl5wgkbEtgt0O8KRnGJqZZ_9b1MVw/exec";
+const GAS_TOKEN = "a809ef3d-639b-449c-847b-326d59743eca"
 
+async function requestGASApp(request) {
 
-
-
-
+  // ★これでCORSエラーは出ません（ただしレスポンスは読めない）
+  fetch(GAS_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify({ "token": GAS_TOKEN, "request": request }),
+  }).catch(console.error);
+}
 
 function openCalculatingScreen() {
   // 画面切替
@@ -3360,6 +3370,42 @@ async function checkAllEndAndClose(players, gameConfig) {
   updates[`rooms/${currentRoomId}/gameConfig/status`] = "end";
 
   await db.ref().update(updates);
+
+  // GAS連携処理　スプレッドシートへ書き込み依頼
+  // --- createdAt → "YYYY-MM-DD"（JST基準）
+  const createdAt = gameConfig?.createdAt;
+  const date = createdAt
+    ? (() => {
+        const d = new Date(createdAt);
+        // 例: "2026/02/04" → "2026-02-04"
+        return new Intl.DateTimeFormat("ja-JP", {
+          timeZone: "Asia/Tokyo",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(d).replaceAll("/", "-");
+      })()
+    : "";
+
+  // --- systemConfig/entryPlayers と突合して dataList を作成
+  const entrySnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+  const entryPlayers = entrySnap.val() || {};
+
+  // directionは考慮しない：players と entryPlayers の playerId が一致するものだけ
+  const dataList = Object.entries(players)
+    .filter(([pid]) => entryPlayers?.[pid])   // entryPlayersに存在するIDのみ
+    .map(([pid, p]) => ({
+      name: entryPlayers[pid]?.name ?? "",
+      score: Number(p?.score ?? 0),
+    }));
+
+  // --- データ整形（例のJSON形式）
+  const payload = { "date": date, "dataList": dataList };
+
+  // 必要ならDBへ保持（後続処理でGASへ送る等に使える）
+  await db.ref(`rooms/${currentRoomId}/gameConfig/resultPayload`).set(payload);
+
+  requestGASApp(payload);
 
   alert("全員の集計完了が揃いました。スコアを保存しました（対局終了画面は未作成）");
   openEndScreen();
