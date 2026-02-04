@@ -967,7 +967,7 @@ function subscribeRooms() {
     try {
       const rooms = snap.val() || {};
       renderRoomList(rooms);
-      if (roomList.children.length === 1) { // headerしかない
+      if (roomList.children.length === 0) { // headerしかない
         const div = document.createElement("div");
         div.style.padding = "8px 0";
         div.textContent = "ルームがありません（または表示対象ステータスがありません）";
@@ -1080,8 +1080,8 @@ function renderRoomList(rooms) {
       <div class="roomCell">
         <div>${nameByPid(pidE)}</div>
         <div>${nameByPid(pidS)}</div>
-        <div>${nameByPid(pidN)}</div>
         <div>${nameByPid(pidW)}</div>
+        <div>${nameByPid(pidN)}</div>        
       </div>
 
       <div class="roomCell">
@@ -3033,7 +3033,7 @@ async function endGame() {
 
     if (cur !== "playing") {
       console.log("[endGame] skipped: status is not playing", { cur });
-      alert("対局中(playing)の状態でのみ終了できます。");
+      alert("対局終了しています。");
       return;
     }
 
@@ -3058,6 +3058,8 @@ async function endGame() {
       return;
     }
 
+    if(!confirm("対局を終了しますか？")) return;
+
     // 2) calculating へ更新（set を使用）
     await myStatusRef.set("calculating");
 
@@ -3074,8 +3076,6 @@ async function endGame() {
       await db.ref(`rooms/${currentRoomId}/gameConfig/status`).set("calculating");
       // subscribeRoomStatus() が全員を集計中画面へ遷移させる想定
     }
-
-    alert("対局終了を送信しました。");
 
   } catch (e) {
     console.error("endGame error:", e);
@@ -3554,7 +3554,11 @@ function stopAllSubscriptions() {
 // ------------------- DB削除 -------------------
 function deleteRoom(roomId) {
   if(!confirm("このルームを削除しますか？")) return;
-  db.ref(`rooms/${roomId}/gameConfig/status`).set("delete");
+  // 物理削除
+  db.ref(`rooms/${roomId}`).remove();
+  // 論理削除
+  // db.ref(`rooms/${roomId}/gameConfig/status`).set("delete");
+  db.ref(`rooms/${roomId}`).remove();
 }
 
 
