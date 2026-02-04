@@ -3042,6 +3042,12 @@ let receiveShowing = false;     // 表示中フラグ
 let receiveQueuedIds = new Set(); // 重複防止
 let receiveCloseTimer = null; 
 
+window.addEventListener("unhandledrejection", () => {
+  receiveOverlay.classList.add("hidden");
+  receiveSheet.classList.add("hidden");
+  receiveShowing = false;
+});
+
 // 履歴購読関数
 function subscribeTransferRequests(){
   if (!currentRoomId) return;
