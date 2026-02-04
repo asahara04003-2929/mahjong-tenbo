@@ -2259,25 +2259,49 @@ let currentReceiveReqId = null;
 
 // 受取ポップアップ 開閉
 function openReceiveSheet(){
+  // ★閉じタイマーが残ってたらキャンセル
+  if (receiveCloseTimer) {
+    clearTimeout(receiveCloseTimer);
+    receiveCloseTimer = null;
+  }
+
   receiveOverlay.classList.remove("hidden");
   receiveSheet.classList.remove("hidden");
+
+  // アニメ開始
   requestAnimationFrame(() => receiveSheet.classList.add("is-open"));
 }
+
 
 function closeReceiveSheet(){
   receiveSheet.classList.remove("is-open");
   receiveOverlay.classList.add("hidden");
-  setTimeout(() => receiveSheet.classList.add("hidden"), 230);
+
+  // ★前のタイマーがあれば消す
+  if (receiveCloseTimer) {
+    clearTimeout(receiveCloseTimer);
+    receiveCloseTimer = null;
+  }
+
+  // ★閉じアニメ後にhidden
+  receiveCloseTimer = setTimeout(() => {
+    // いま開いてない時だけhidden（次を開いてたら隠さない）
+    if (!receiveSheet.classList.contains("is-open")) {
+      receiveSheet.classList.add("hidden");
+    }
+    receiveCloseTimer = null;
+  }, 230);
 
   // 表示中終了
   currentReceiveReqId = null;
   receiveShowing = false;
 
-  // 次があれば続けて表示
+  // ★次の受取は「閉じアニメが終わってから」表示する
   setTimeout(() => {
     showNextReceiveIfNeeded();
-  }, 0);
+  }, 240);
 }
+
 
 
 async function loadHistoryOnce(){
@@ -3016,6 +3040,7 @@ function subscribeHistoryAllByCheckedAtAsc(){
 let receiveQueue = [];          // [{ id, req }]
 let receiveShowing = false;     // 表示中フラグ
 let receiveQueuedIds = new Set(); // 重複防止
+let receiveCloseTimer = null; 
 
 // 履歴購読関数
 function subscribeTransferRequests(){
@@ -3029,9 +3054,14 @@ function subscribeTransferRequests(){
   const ref = db.ref(`rooms/${roomId}/transferRequests`);
 
   // ★ 初期化（入室のたびにクリアしたいなら）
+  if (receiveCloseTimer) {
+    clearTimeout(receiveCloseTimer);
+    receiveCloseTimer = null;
+  }
   receiveQueue = [];
   receiveQueuedIds = new Set();
   receiveShowing = false;
+  currentReceiveReqId = null;
 
   const handler = (snap) => {
     const req = snap.val();
