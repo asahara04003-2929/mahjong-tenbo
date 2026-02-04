@@ -2268,8 +2268,17 @@ function closeReceiveSheet(){
   receiveSheet.classList.remove("is-open");
   receiveOverlay.classList.add("hidden");
   setTimeout(() => receiveSheet.classList.add("hidden"), 230);
+
+  // 表示中終了
   currentReceiveReqId = null;
+  receiveShowing = false;
+
+  // 次があれば続けて表示
+  setTimeout(() => {
+    showNextReceiveIfNeeded();
+  }, 0);
 }
+
 
 async function loadHistoryOnce(){
   if (!currentRoomId) return;
@@ -3003,7 +3012,12 @@ function subscribeHistoryAllByCheckedAtAsc(){
 }
 
 
-// 購読関数
+// ===== 受取ポップアップのキュー制御 =====
+let receiveQueue = [];          // [{ id, req }]
+let receiveShowing = false;     // 表示中フラグ
+let receiveQueuedIds = new Set(); // 重複防止
+
+// 履歴購読関数
 function subscribeTransferRequests(){
   if (!currentRoomId) return;
   if (transferUnsub) transferUnsub();
@@ -3014,33 +3028,72 @@ function subscribeTransferRequests(){
 
   const ref = db.ref(`rooms/${roomId}/transferRequests`);
 
-  const handler = async (snap) => {
+  // ★ 初期化（入室のたびにクリアしたいなら）
+  receiveQueue = [];
+  receiveQueuedIds = new Set();
+  receiveShowing = false;
+
+  const handler = (snap) => {
     const req = snap.val();
     if (!req) return;
 
     // payment だけ受取側にポップアップ（pendingのみ）
     if (req.type === "payment" && req.status === "pending" && req.toPlayerId === myPid) {
-      // 名前表示用
-      const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
-      const ep = eSnap.val() || {};
-      const fromName = ep[req.fromPlayerId]?.name ?? req.fromPlayerId;
-      const toName   = ep[req.toPlayerId]?.name ?? req.toPlayerId;
+      const id = snap.key;
+      if (!id) return;
 
-      currentReceiveReqId = snap.key;
+      // 重複防止
+      if (receiveQueuedIds.has(id)) return;
+      receiveQueuedIds.add(id);
 
-      setText("recvFromName", fromName);
-      setText("recvToName", toName);
-      setText("recvPoint", String(req.point ?? "-"));
-      setText("recvToBefore", String(req.toBefore ?? "-"));
-      setText("recvToAfter", String(req.toAfter ?? "-"));
+      // キュー投入（順序は showNextReceiveIfNeeded 内で古い順に揃える）
+      receiveQueue.push({ id, req });
 
-      openReceiveSheet();
+      // 表示中でなければ次を表示
+      showNextReceiveIfNeeded();
     }
   };
 
-  // child_added だと古い履歴も全部来る → 「未チェックのものだけ拾う」のでOK
+  // child_added で既存分も来る（キー順で来るが、念のため createdAt で並べる）
   ref.on("child_added", handler);
   transferUnsub = () => ref.off("child_added", handler);
+}
+
+
+// 履歴：次の1件を表示する関数
+async function showNextReceiveIfNeeded(){
+  if (receiveShowing) return;
+  if (!receiveQueue.length) return;
+
+  // 古い順（createdAt優先、同値はid）
+  receiveQueue.sort((a,b) => {
+    const ac = Number(a.req?.createdAt ?? 0);
+    const bc = Number(b.req?.createdAt ?? 0);
+    if (ac !== bc) return ac - bc;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  const next = receiveQueue.shift();
+  if (!next) return;
+
+  receiveShowing = true;
+
+  const req = next.req;
+  currentReceiveReqId = next.id;
+
+  // 名前表示用
+  const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+  const ep = eSnap.val() || {};
+  const fromName = ep[req.fromPlayerId]?.name ?? req.fromPlayerId;
+  const toName   = ep[req.toPlayerId]?.name ?? req.toPlayerId;
+
+  setText("recvFromName", fromName);
+  setText("recvToName", toName);
+  setText("recvPoint", String(req.point ?? "-"));
+  setText("recvToBefore", String(req.toBefore ?? "-"));
+  setText("recvToAfter", String(req.toAfter ?? "-"));
+
+  openReceiveSheet();
 }
 
 
