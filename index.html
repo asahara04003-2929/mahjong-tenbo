@@ -1828,7 +1828,7 @@ async function onRiichiTake(){
     fromAfter: null,
     toBefore: before,
     toAfter: after,
-    type: "riichi",        // 受取もriichi扱いでOK（仕様に合わせる）
+    type: "riichi_receive",
     status: "checked",
     createdAt: firebase.database.ServerValue.TIMESTAMP,
     checkedAt: firebase.database.ServerValue.TIMESTAMP,
@@ -1897,7 +1897,8 @@ function subscribeHistory(){
 
 const transferRequestType = {
   "payment": "支払", 
-  "riichi": "リーチ棒"
+  "riichi": "リーチ宣言",
+  "riichi_receive": "リーチ棒受取"
 }
 
 const transferRequestStatus = {
@@ -1960,8 +1961,8 @@ function renderHistoryList(entryPlayers){
       </div>
 
       <div class="historyMeta">
-        <div>${from}: ${h.fromPlayerId === "pot" ? "場" : (h.fromBefore ?? "-")} → ${h.fromAfter ?? "-"}</div>
-        <div>${to}: ${h.toBefore ?? "-"} → ${h.toAfter ?? "-"}</div>
+        <div>${h.fromPlayerId === "pot" ? "-" : from + ": " + (h.fromBefore ?? "-") + " → " + h.fromAfter ?? "-"}</div>
+        <div>${h.toPlayerId === "pot" ? "-" : to + ": " + (h.toBefore ?? "-") + " → " + (h.toAfter ?? "-")}</div>
       </div>
     `;
 
