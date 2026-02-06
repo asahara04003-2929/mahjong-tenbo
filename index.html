@@ -29,8 +29,10 @@ select { margin-left:6px; }
 <!-- ログイン -->
 <!-- ========================================= -->
 <div id="loginScreen">
+  <div id="loginBox">
   <input id="loginPass" placeholder="パスワード">
   <button onclick="login()">ログイン</button>
+  </div>
 </div>
 
 <!-- ========================================= -->
@@ -337,14 +339,26 @@ select { margin-left:6px; }
           <span id="gyMyName">-</span>
         </div>
       </div>
+
       <div class="gs-cardRow">
         <div class="gs-cardLabel">点差：</div>
         <div class="gs-cardValue">
           <span id="gyDiff">-</span>
         </div>
       </div>
-    </div>
 
+      <div class="gs-cardRow">
+        <div class="gs-cardLabel">リーチ棒：</div>
+        <div class="gs-cardValue">
+          <span id="gyRiichiStickCount">-</span>
+          <span id="gyRiichiPoint">-</span>
+        </div>
+      </div>
+      <div style="margin-top:6px; font-size:12px; opacity:.8;">
+        ※リーチ棒（供託）も含めて算出されます。
+      </div>
+
+    </div>
     <!-- 直撃（ロン） -->
     <div class="gs-card">
       <div style="font-weight:900; margin-bottom:6px;">直撃の場合</div>
@@ -2331,6 +2345,7 @@ async function loadHistoryOnce(){
 // ===============================
 let gyakuLatestPlayers = null;
 let gyakuLatestEntryPlayers = null;
+let gyakuLatestgameConfig = null;
 
 // 023: 自分が 親/子
 let gyakuSelfRole = null; // "parent" | "child"
@@ -2544,25 +2559,29 @@ function showEl(id, show){
 }
 
 // 抜け番（3麻4人回し）の「直撃（ロン）」表示
-// 前提：players は {pid: {name, point}} みたいな構造を想定
+// - トップは支払い0（±0）
+// - トップ以外の2人がそれぞれ payEach を支払う
+// - 自分の増分は (payEach*2 + リーチ棒)
 function renderRonNuke_3r4({
   rule,
-  selfRole,     // "parent" or "child"
+  selfRole,      // "parent" or "child"
   mePid,
   topPid,
-  diffAbs,      // |topPoint - mePoint|
-  players
-}){
+  diffAbs,       // 表示用に0判定などに使う（元の点差）
+  diffForMap,    // ★表判定用（リーチ棒控除後の差分）
+  riichiPoint,   // ★自分加算用（場のリーチ棒）
+  players        // { pid: {name, point}, ... }
+}) {
   const enable = (rule === "3r4");
   showEl("gyRonNuke", enable);
   if (!enable) return;
 
-  // トップ以外＆自分以外の2人
+  // トップ以外＆自分以外の2人（= 支払い担当2人）
   const otherPids = Object.keys(players || {})
     .filter(pid => pid !== mePid && pid !== topPid)
     .slice(0, 2);
 
-  // 万一2人取れないケースは非表示
+  // 万一2人取れないなら非表示
   if (otherPids.length < 2) {
     showEl("gyRonNuke", false);
     return;
@@ -2573,49 +2592,60 @@ function renderRonNuke_3r4({
   const o1  = players[otherPids[0]];
   const o2  = players[otherPids[1]];
 
-  // 通常直撃の必要点（表のpoint列: 1500/3000/... or 1000/2000/...）
-  const baseRow  = lookupRonRow(diffAbs * 2, selfRole);
-  const baseNeed = baseRow.point;
+  // -----------------------------
+  // ① 表（役/点）の判定は diffForMap を使う
+  //   ※通常ロンと同じ考え方（リーチ棒分は差分から控除して表を引く）
+  // -----------------------------
+  const ronTable = (selfRole === "parent") ? RON_TABLE_PARENT : RON_TABLE_CHILD;
+  const baseRow  = findNeed(diffForMap, ronTable);      // {min,max,point,label}
+  const payEach  = Number(baseRow.point || 0);          // 2人がそれぞれ支払う額
 
-  // ★黄色列（トップ以外 point）は通常直撃(point)の2倍
-  const nukeNeed = baseNeed;
+  // ★和了者の増分：2人分 + リーチ棒
+  const meGain = payEach + Number(riichiPoint || 0);
 
-  // ★抜け番ロン：トップは±0、トップ以外2人がそれぞれ nukeNeed を支払う
-  const payEach = nukeNeed;
-
+  // -----------------------------
+  // ② before/after 計算
+  // -----------------------------
   const meBefore  = Number(me?.point ?? 0);
   const topBefore = Number(top?.point ?? 0);
   const o1Before  = Number(o1?.point ?? 0);
   const o2Before  = Number(o2?.point ?? 0);
 
-  const meAfter  = meBefore + payEach;
-  const topAfter = topBefore;              // トップは±0
-  const o1After  = o1Before - payEach;
+  const meAfter  = meBefore + meGain;
+  const topAfter = topBefore;          // トップは±0
+  const o1After  = o1Before - payEach; // 支払いは各payEach
   const o2After  = o2Before - payEach;
 
-  // 表示（必要点は黄色列の値を出す）
-  setText("gyRonNeed_nuke", diffAbs ? formatNeed(baseRow.label, nukeNeed) : "-");
+  // -----------------------------
+  // ③ 表示
+  //   diffAbs が0（=自分がトップ等）なら "-" を出す既存仕様を維持
+  // -----------------------------
+  setText("gyRonNeed_nuke", diffAbs ? formatNeed(baseRow.label, meGain) : "-");
 
-  setText("gyRonMeBefore_nuke", diffAbs ? meBefore : "-");
-  setText("gyRonMeAfter_nuke",  diffAbs ? meAfter : "-");
-  setText("gyRonMeDelta_nuke",  diffAbs ? `（+${payEach}）` : "-");
+  // 自分
+  setText("gyRonMeBefore_nuke", diffAbs ? String(meBefore) : "-");
+  setText("gyRonMeAfter_nuke",  diffAbs ? String(meAfter)  : "-");
+  setText("gyRonMeDelta_nuke",  diffAbs ? `（+${meGain}）` : "-");
 
-  setText("gyRonTopName", diffAbs ? `${top?.name}` ?? "TOP" : "-");
-  setText("gyRonTopBefore_nuke", diffAbs ? topBefore : "-");
-  setText("gyRonTopAfter_nuke",  diffAbs ? topAfter : "-");
+  // TOP
+  setText("gyRonTopName",        diffAbs ? (top?.name ?? "TOP") : "-"); // ★??の優先順位修正
+  setText("gyRonTopBefore_nuke", diffAbs ? String(topBefore) : "-");
+  setText("gyRonTopAfter_nuke",  diffAbs ? String(topAfter)  : "-");
   setText("gyRonTopDelta_nuke",  diffAbs ? "（±0）" : "-");
 
+  // その他①②
   setText("gyRonOther1Name", o1?.name ?? "その他①");
   setText("gyRonOther2Name", o2?.name ?? "その他②");
 
-  setText("gyRonOther1Before", diffAbs ? o1Before : "-");
-  setText("gyRonOther1After",  diffAbs ? o1After : "-");
+  setText("gyRonOther1Before", diffAbs ? String(o1Before) : "-");
+  setText("gyRonOther1After",  diffAbs ? String(o1After)  : "-");
   setText("gyRonOther1Delta",  diffAbs ? `（-${payEach}）` : "-");
 
-  setText("gyRonOther2Before", diffAbs ? o2Before : "-");
-  setText("gyRonOther2After",  diffAbs ? o2After : "-");
+  setText("gyRonOther2Before", diffAbs ? String(o2Before) : "-");
+  setText("gyRonOther2After",  diffAbs ? String(o2After)  : "-");
   setText("gyRonOther2Delta",  diffAbs ? `（-${payEach}）` : "-");
 }
+
 
 
 
@@ -2665,8 +2695,8 @@ function hookGyakuRadioOnce(){
     r.onchange = null;
     r.onchange = () => {
       gyakuSelfRole = r.value;
-      if (gyakuLatestPlayers && gyakuLatestEntryPlayers) {
-        renderGyakuSheet(gyakuLatestPlayers, gyakuLatestEntryPlayers);
+      if (gyakuLatestPlayers && gyakuLatestEntryPlayers && gyakuLatestgameConfig) {
+        renderGyakuSheet(gyakuLatestPlayers, gyakuLatestEntryPlayers, gyakuLatestgameConfig);
       }
     };
   });
@@ -2706,15 +2736,18 @@ function subscribeGyakuSheet(){
 
   const playersRef = db.ref(`rooms/${currentRoomId}/players`);
   const entryRef   = db.ref(`systemConfig/entryPlayers`);
+  const gameConfigRef   = db.ref(`rooms/${currentRoomId}/gameConfig`);
 
   const handler = async () => {
-    const [pSnap, eSnap] = await Promise.all([
+    const [pSnap, eSnap, gSnap] = await Promise.all([
       playersRef.once("value"),
       entryRef.once("value"),
+      gameConfigRef.once("value"),
     ]);
     gyakuLatestPlayers = pSnap.val() || {};
     gyakuLatestEntryPlayers = eSnap.val() || {};
-    renderGyakuSheet(gyakuLatestPlayers, gyakuLatestEntryPlayers);
+    gyakuLatestgameConfig = gSnap.val() || {};
+    renderGyakuSheet(gyakuLatestPlayers, gyakuLatestEntryPlayers, gyakuLatestgameConfig);
   };
 
   playersRef.on("value", handler);
@@ -2725,7 +2758,7 @@ function subscribeGyakuSheet(){
 }
 
 // 逆転
-function renderGyakuSheet(players, entryPlayers){
+function renderGyakuSheet(players, entryPlayers, gyakuLatestgameConfig){
   const myPid = currentGameInfo?.playerId;
   if (!myPid || !players?.[myPid]) return;
 
@@ -2747,39 +2780,50 @@ function renderGyakuSheet(players, entryPlayers){
   const diffRaw = Number(topPoint - myPoint);
   const diff = Math.max(0, diffRaw);
 
-  // 023: 自分の立場（ラジオから直接拾う）
+  // ★リーチ棒（場）を考慮
+  const riichi_stick_count = Number(gyakuLatestgameConfig?.riichiStickCount ?? 0);
+  const riichi_point = riichi_stick_count * 1000;
+
+  // ★表のマッピングに使う差分：差分 - リーチ棒（下限0）
+  const diffForMap = Math.max(0, diff - riichi_point);
+
+  // 023: 自分の立場
   const selfRole = document.querySelector('input[name="gySelfRole"]:checked')?.value || "child";
-  gyakuSelfRole = selfRole; // 既存ロジックとも整合させる（保険）
+  gyakuSelfRole = selfRole;
   const isSelfParent = (selfRole === "parent");
+
+  // 表示（トップ/自分/点差/リーチ棒）
+  setText("gyName", `${String(entryPlayers[topPid].name)}（${topPoint}）`);
+  setText("gyMyName", `${String(entryPlayers[myPid].name)}（${myPoint}）`);
+  setText("gyDiff", String(diff * -1)); // 表示は従来通り（必要ならここも diffForMap に変えられます）
+  setText("gyRiichiStickCount", `${String(riichi_stick_count)}本`);
+  setText("gyRiichiPoint",  diff ? `（${riichi_point}）` : "-");
 
   // ---------- 直撃（ロン） ----------
   const ronRow = (topPid === myPid)
     ? { point: 0, label: "トップ" }
-    : findNeed(diff, isSelfParent ? RON_TABLE_PARENT : RON_TABLE_CHILD);
+    // ★マッピングは diffForMap を使う
+    : findNeed(diffForMap, isSelfParent ? RON_TABLE_PARENT : RON_TABLE_CHILD);
 
-  // 差分表示（役名 + 点数）
-  setText("gyName", `${String(entryPlayers[topPid].name)}（${topPoint}）`);
-  setText("gyMyName", `${String(entryPlayers[myPid].name)}（${myPoint}）`);
-  setText("gyDiff", String(diff*-1));
-
+  const baseRonP = Number(ronRow.point ?? 0);          // 相手から取るロン点（表の点）
+  const meRonGain = baseRonP + riichi_point;           // ★自分の増分はリーチ棒分を足す
 
   // 直撃表示
   const ronP = Number(ronRow.point ?? 0);
-  setText("gyRonNeed", diff ? formatNeed(ronRow?.label, ronP) : "-");
+  setText("gyRonNeed", diff ? formatNeed(ronRow?.label, meRonGain) : "-");
 
   setText("gyRonMeBefore", diff ? String(myPoint) : "-");
-  setText("gyRonMeAfter",  diff ? String(myPoint + ronP) : "-");
-  setText("gyRonMeDelta",  diff ? `（+${ronP}）` : "-");
+  setText("gyRonMeAfter",  diff ? String(myPoint + meRonGain) : "-");
+  setText("gyRonMeDelta",  diff ? `（+${meRonGain}）` : "-");
 
   setText("gyRonTopBefore", diff ? String(topPoint) : "-");
-  setText("gyRonTopAfter",  diff ? String(topPoint - ronP) : "-");
-  setText("gyRonTopDelta",  diff ? `（-${ronP}）` : "-");
+  setText("gyRonTopAfter",  diff ? String(topPoint - baseRonP) : "-"); // ★トップ減分は据え置き
+  setText("gyRonTopDelta",  diff ? `（-${baseRonP}）` : "-");
 
-  // ---------- ★3麻4人回し：抜け番（ロン）を再計算して描画 ----------
-  // renderRonNuke_3r4 は players[pid].name を参照するので、name付きのmapを作って渡す
+  // ---------- ★3麻4人回し：抜け番（ロン） ----------
   const playersForRonNuke = {};
   for (const [pid, p] of Object.entries(players || {})) {
-    if (!p?.direction) continue; // 参加者のみ（観戦や空席を除外）
+    if (!p?.direction) continue;
     playersForRonNuke[pid] = {
       name: entryPlayers?.[pid]?.name ?? pid,
       point: Number(p.point ?? 0),
@@ -2787,22 +2831,23 @@ function renderGyakuSheet(players, entryPlayers){
   }
 
   renderRonNuke_3r4({
-    rule: currentRule,                      // rooms/{roomId}/gameConfig/rule を currentRule に入れてる前提
-    selfRole,                               // "parent" or "child"
+    rule: currentRule,
+    selfRole,
     mePid: myPid,
     topPid,
-    diffAbs: Math.abs(topPoint - myPoint),  // diffでもOK
+    diffAbs: Math.abs(topPoint - myPoint),   // 元の点差（表示用のままでOK）
+    diffForMap,                              // ★追加：表判定用
+    riichiPoint: riichi_point,               // ★追加：自分加算用
     players: playersForRonNuke
   });
 
-
-  // ---------- ツモ（2パターン） ----------
+  // ---------- ツモ ----------
   if (topPid === myPid) {
     renderGyakuTsumoBlocks(selfRole,
       { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" },
       { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" }
     );
-    renderGyakuNuke(false, diff, selfRole, myPoint, topPoint); // 3r4以外は隠す
+    renderGyakuNuke(false, diff, selfRole, myPoint, topPoint, riichi_point, diffForMap);
     return;
   }
 
@@ -2813,7 +2858,7 @@ function renderGyakuSheet(players, entryPlayers){
       { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" },
       { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" }
     );
-    renderGyakuNuke(false, diff, selfRole, myPoint, topPoint);
+    renderGyakuNuke(false, diff, selfRole, myPoint, topPoint, riichi_point, diffForMap);
     return;
   }
 
@@ -2821,49 +2866,52 @@ function renderGyakuSheet(players, entryPlayers){
   let patVsChild  = null;
 
   if (selfRole === "parent") {
-    // 自分=親：相手(トップ)は子パターンのみ
-    const row = findNeedRow(diff, tables.parent_vs_child);
+    // ★diffForMap で判定
+    const row = findNeedRow(diffForMap, tables.parent_vs_child);
+    const meGain = Number(row.selfGain) + riichi_point;
+
     patVsChild = {
-      need: `${row.label}（+${row.selfGain} / トップ-${row.topLoss}）`,
+      need: `${row.label}（+${meGain} / トップ-${row.topLoss}）`,
       meBefore: String(myPoint),
-      meAfter:  String(myPoint + row.selfGain),
-      meDelta:  `（+${row.selfGain}）`,
+      meAfter:  String(myPoint + meGain),
+      meDelta:  `（+${meGain}）`,
       topBefore:String(topPoint),
       topAfter: String(topPoint - row.topLoss),
       topDelta: `（-${row.topLoss}）`,
     };
   } else {
-    // 自分=子：相手が親/子でテーブルを変える（両方出す）
-    const rowParent = findNeedRow(diff, tables.child_vs_parent);
-    const rowChild  = findNeedRow(diff, tables.child_vs_child);
+    const rowParent = findNeedRow(diffForMap, tables.child_vs_parent);
+    const rowChild  = findNeedRow(diffForMap, tables.child_vs_child);
+
+    const meGainParent = Number(rowParent.selfGain) + riichi_point;
+    const meGainChild  = Number(rowChild.selfGain)  + riichi_point;
 
     patVsParent = {
-      need: `${rowParent.label}（+${rowParent.selfGain} / トップ-${rowParent.topLoss}）`,
+      need: `${rowParent.label}（+${meGainParent} / トップ-${rowParent.topLoss}）`,
       meBefore: String(myPoint),
-      meAfter:  String(myPoint + rowParent.selfGain),
-      meDelta:  `（+${rowParent.selfGain}）`,
+      meAfter:  String(myPoint + meGainParent),
+      meDelta:  `（+${meGainParent}）`,
       topBefore:String(topPoint),
       topAfter: String(topPoint - rowParent.topLoss),
       topDelta: `（-${rowParent.topLoss}）`,
     };
     patVsChild = {
-      need: `${rowChild.label}（+${rowChild.selfGain} / トップ-${rowChild.topLoss}）`,
+      need: `${rowChild.label}（+${meGainChild} / トップ-${rowChild.topLoss}）`,
       meBefore: String(myPoint),
-      meAfter:  String(myPoint + rowChild.selfGain),
-      meDelta:  `（+${rowChild.selfGain}）`,
+      meAfter:  String(myPoint + meGainChild),
+      meDelta:  `（+${meGainChild}）`,
       topBefore:String(topPoint),
       topAfter: String(topPoint - rowChild.topLoss),
       topDelta: `（-${rowChild.topLoss}）`,
     };
   }
 
-
-
   renderGyakuTsumoBlocks(selfRole, patVsParent, patVsChild);
 
-  // 3r4 抜け番（必要なら表示）
-  renderGyakuNuke(currentRule === "3r4", diff, selfRole, myPoint, topPoint);
+  // ★3r4 抜け番：diffForMap & riichi_point を渡す
+  renderGyakuNuke(currentRule === "3r4", diff, selfRole, myPoint, topPoint, riichi_point, diffForMap);
 }
+
 
 
 
@@ -2912,7 +2960,7 @@ function renderGyakuTsumoBlocks(selfRole, patVsParent, patVsChild) {
   setText("gyTsumoTopDelta_vsChild", patVsChild?.topDelta ?? "（-0）");
 }
 
-function renderGyakuNuke(enabled, diff, selfRole, myPoint, topPoint){
+function renderGyakuNuke(enabled, diff, selfRole, myPoint, topPoint, riichiPoint, diffForMap){
   const box = document.getElementById("gyTsumoNuke");
   if (!box) return;
 
@@ -2924,16 +2972,18 @@ function renderGyakuNuke(enabled, diff, selfRole, myPoint, topPoint){
   box.classList.remove("hidden");
 
   const is023OyaSelected = (selfRole === "parent");
-  const nuke = lookupNuke(diff, is023OyaSelected); // { me: xxx, opp:0 }
+  const nuke = lookupNuke(diffForMap, is023OyaSelected); // ★diffForMapで判定
 
-  setText("gyTsumoNeed_nuke", `${nuke.label}（+${nuke.me} / トップ-0）`);
+  const meGain = Number(nuke.me) + Number(riichiPoint || 0);
+
+  setText("gyTsumoNeed_nuke", `${nuke.label}（+${meGain} / トップ-0）`);
 
   setText("gyTsumoMeBefore_nuke", String(myPoint));
-  setText("gyTsumoMeAfter_nuke",  String(myPoint + Number(nuke.me)));
-  setText("gyTsumoMeDelta_nuke",  `（+${nuke.me}）`);
+  setText("gyTsumoMeAfter_nuke",  String(myPoint + meGain));
+  setText("gyTsumoMeDelta_nuke",  `（+${meGain}）`);
 
   setText("gyTsumoTopBefore_nuke", String(topPoint));
-  setText("gyTsumoTopAfter_nuke",  String(topPoint)); // トップ減らない
+  setText("gyTsumoTopAfter_nuke",  String(topPoint));
   setText("gyTsumoTopDelta_nuke",  `（-0）`);
 }
 

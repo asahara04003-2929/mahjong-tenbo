@@ -75,6 +75,22 @@ body{
   margin-top: 20px;
 }
 
+/* ログイン画面を中央に */
+#loginScreen{
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: url("icons/icon-512.png") center;
+  background-size: cover;
+  z-index: 9;
+}
+
+#loginBox{
+  padding: 24px;
+  z-index: 10;
+}
+
 .playerBox {
   border: 1px solid #999;
   padding: 10px;
