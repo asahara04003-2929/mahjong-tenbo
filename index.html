@@ -1,0 +1,3878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="style.css">
+
+<meta name="theme-color" content="#CFEEC0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+
+<script src="firebaseConfig.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+.hidden { display:none; }
+.room { border:1px solid #ccc; margin:6px 0; padding:6px; }
+select { margin-left:6px; }
+</style>
+</head>
+
+<body>
+
+<!-- ========================================= -->
+<!-- ログイン -->
+<!-- ========================================= -->
+<div id="loginScreen">
+  <div id="loginBox">
+  <input id="loginPass" placeholder="パスワード">
+  <button onclick="login()">ログイン</button>
+  </div>
+</div>
+
+<!-- ========================================= -->
+<!-- プレイヤー設定（新規） -->
+<!-- ========================================= -->
+<div id="playerConfigScreen" class="hidden">
+  <h2>プレイヤー設定</h2>
+
+  <!-- 001: プルダウン -->
+  <div style="margin:12px 0;">
+    <label>プレイヤー：</label>
+    <select id="playerConfigSelect"></select>
+  </div>
+
+  <!-- 002: 設定完了 -->
+  <button id="btnPlayerConfigDone" onclick="completePlayerConfig()">設定完了</button>
+
+  <div style="height:24px;"></div>
+
+  <!-- 004: ルーム一覧へ戻る -->
+  <div style="margin-top:12px;">
+    <button onclick="goRoomList()">ルーム一覧へ戻る</button>
+  </div>
+
+  <div id="playerConfigMsg" style="margin-top:10px; color:#b00;"></div>
+</div>
+
+
+<!-- ========================================= -->
+<!-- ルーム一覧 -->
+<!-- ========================================= -->
+<div id="roomListScreen" class="hidden">
+
+  <!-- 固定（ルーム一覧でのみ表示） -->
+  <div class="roomListTop">
+    <h2>ルーム一覧</h2>
+    <div id="myPlayerLabel" style="font-weight:700;"></div>
+
+    <div class="roomListButtons">
+      <button onclick="openRoomCreateScreen()">ルーム作成</button>
+      <button onclick="openPlayerConfigScreen()">プレイヤー設定</button>
+      <button onclick="openAddPlayerFromRoomList()">プレイヤー追加</button>
+    </div>
+
+    <div id="roomListTableHeader"></div>
+  </div>
+
+  <!-- スクロール（ルーム一覧でのみ表示） -->
+  <div id="roomList" class="roomListScroll"></div>
+
+</div>
+
+<!-- ========================================= -->
+<!-- ルーム作成（新規） -->
+<!-- ========================================= -->
+<div id="roomCreateScreen" class="hidden">
+  <h2>ルーム作成</h2>
+
+  <div style="margin:10px 0;">
+    <div style="margin-bottom:8px;">ルール：</div>
+    <label><input type="radio" name="create_rule" value="3" checked>3麻</label>
+    <label style="margin-left:10px;"><input type="radio" name="create_rule" value="3r4">3麻4人回し</label>
+    <label style="margin-left:10px;"><input type="radio" name="create_rule" value="4">4麻</label>
+  </div>
+
+  <div style="margin:10px 0;">
+    <label>原点：</label>
+    <input type="number" id="createStartPoint" step="5000" value="45000" style="width:120px;">
+  </div>
+
+  <div style="margin:10px 0;">
+    <label>返し点：</label>
+    <input type="number" id="createReturnPoint" step="5000" value="50000" style="width:120px;">
+  </div>
+
+  <div style="margin:14px 0;">
+    <div style="margin-bottom:8px;">席順</div>
+
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+      <div style="width:40px;">東：</div>
+      <select id="createSeatE"></select>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+      <div style="width:40px;">南：</div>
+      <select id="createSeatS"></select>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+      <div style="width:40px;">西：</div>
+      <select id="createSeatW"></select>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+      <div style="width:40px;">北：</div>
+      <select id="createSeatN"></select>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:10px; margin-top:14px;">
+    <button id="btnCreateRoomDo" onclick="createRoomFromCreateScreen()">ルーム作成</button> <!-- 008 -->
+    <button onclick="backToRoomList()">戻る</button>
+  </div>
+
+  <div id="roomCreateMsg" style="margin-top:10px; color:#b00;"></div>
+</div>
+
+
+<!-- ========================================= -->
+<!-- プレイヤー追加 -->
+<!-- ========================================= -->
+<div id="addPlayerScreen" class="hidden">
+  <h2>プレイヤー追加</h2>
+  <input id="newPlayerName" placeholder="名前">
+  <button onclick="addPlayer()">登録</button>
+  <button onclick="backToPlayerSetup()">戻る</button>
+</div>
+
+
+<!-- ========================================= -->
+<!-- 対局画面 -->
+<!-- ========================================= -->
+<div id="gameScreen" class="hidden">
+  <h2 class="gs-title">対局中</h2>
+  <!-- リーチ棒表示（左上） -->
+  <div id="riichiHUD" class="riichiHUD" aria-label="リーチ棒">
+    <span class="riichiStick" aria-hidden="true"></span>
+    <span class="riichiTimes">×<span id="riichiCount">0</span></span>
+  </div>
+  <div class="gs-layout">
+    <!-- =========================
+         左：卓（点数表示）
+    ========================== -->
+    <section class="gs-tableWrap">
+      <div id="gameTable" class="gs-table">
+        <!-- 北(相手) -->
+        <div class="gs-seat gs-north">
+          <div class="gs-name" id="nameN">-</div>
+          <div class="gs-point" id="pointN">-</div>
+          <div class="gs-diff" id="diffN">-</div>
+          <img class="yakitoriImg" id="yakitoriN" src="image/yakitori_on.png" alt="">
+        </div>
+
+        <!-- 西(相手) -->
+        <div class="gs-seat gs-west">
+          <div class="gs-name" id="nameW">-</div>
+          <div class="gs-point" id="pointW">-</div>
+          <div class="gs-diff" id="diffW">-</div>
+          <img class="yakitoriImg" id="yakitoriW" src="image/yakitori_on.png" alt="">
+        </div>
+
+        <!-- 東(自分) -->
+        <div class="gs-seat gs-self">
+          <div class="gs-selfName" id="myName">-</div>
+          <div class="gs-selfPoint" id="myPoint">-</div>
+          <img class="yakitoriImg" id="yakitoriME" src="image/yakitori_on.png" alt="">
+        </div>
+
+        <!-- 南(相手) -->
+        <div class="gs-seat gs-south">
+          <div class="gs-name" id="nameS">-</div>
+          <div class="gs-point" id="pointS">-</div>
+          <div class="gs-diff" id="diffS">-</div>
+          <img class="yakitoriImg" id="yakitoriS" src="image/yakitori_on.png" alt="">
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================
+        下：操作パネル
+  ========================== -->
+  <aside class="gs-panel">
+    <!-- リーチ系 -->
+    <div class="gs-row">
+      <button class="gs-btn gs-btnWide" id="btnRiichiAdd" onclick="onRiichiAdd()">リーチ</button>
+      <button class="gs-btn" id="btnRiichiTake" onclick="onRiichiTake()">受取</button>
+      <button class="gs-btn" id="btnGyaku" onclick="openGyakuSheet()">逆転条件</button>
+      <button class="gs-btn" id="btnHistory" onclick="openHistorySheet()">履歴</button>
+    </div>
+    <div class="gs-row">
+    <!-- 対局終了 -->
+      <button class="gs-btn gs-btnDanger" id="btnEndGame" onclick="endGame()">対局終了</button>
+      <button class="gs-btn" onclick="backToRoomList()">ルーム一覧へ戻る</button>
+    </div>
+  </aside>
+</div>
+
+
+<!-- =========================
+     支払ボトムシート（下からせり出し）
+========================= -->
+<div id="transferOverlay" class="ts-overlay hidden" onclick="closeTransferSheet()"></div>
+
+<div id="transferSheet" class="ts-sheet hidden" role="dialog" aria-modal="true">
+  <div class="ts-handle"></div>
+
+  <div class="ts-header">
+    <div class="ts-title">支払</div>
+    <button class="ts-close" onclick="closeTransferSheet()">✕</button>
+  </div>
+
+  <!-- 支払状況（元の赤枠の上部） -->
+  <div class="gs-card">
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">支払先：</div>
+      <div class="gs-cardValue"><span id="sendToName">-</span></div>
+    </div>
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">支払点数：</div>
+      <div class="gs-cardValue"><span id="sendAmount">0</span></div>
+    </div>
+  </div>
+
+  <!-- 加算ボタン -->
+  <div class="gs-amountGrid">
+    <button class="gs-btn" onclick="addAmount(10000)">10000</button>
+    <button class="gs-btn" onclick="addAmount(1000)">1000</button>
+    <button class="gs-btn" onclick="addAmount(100)">100</button>
+    <button class="gs-btn" onclick="addAmount(5000)">5000</button>
+    <button class="gs-btn" onclick="addAmount(500)">500</button>
+    <button class="gs-btn gs-btnSub" onclick="cancelAmountValue()">クリア</button>
+  </div>
+
+  <!-- 確定/取消 -->
+  <div class="gs-row">
+    <button class="gs-btn gs-btnPrimary" id="btnConfirm" onclick="confirmTransfer()">確定</button>
+    <button class="gs-btn" id="btnCancel" onclick="cancelTransfer()">取消</button>
+  </div>
+</div>
+
+<!-- =========================
+     受取ポップアップ（paymentのみ）
+========================= -->
+<div id="receiveOverlay" class="ts-overlay hidden"></div>
+
+<div id="receiveSheet" class="ts-sheet hidden" role="dialog" aria-modal="true">
+  <div class="ts-handle"></div>
+
+  <div class="ts-header">
+    <div class="ts-title">支払情報</div>
+    <button class="ts-close" onclick="closeReceiveSheet()">×</button>
+  </div>
+
+  <div class="gs-card">
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">支払：</div>
+      <div class="gs-cardValue">
+        <span id="recvFromName">-</span> → <span id="recvToName">-</span>
+      </div>
+    </div>
+
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">支払点：</div>
+      <div class="gs-cardValue"><span id="recvPoint">-</span></div>
+    </div>
+
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">受取前：</div>
+      <div class="gs-cardValue"><span id="recvToBefore">-</span></div>
+    </div>
+
+    <div class="gs-cardRow">
+      <div class="gs-cardLabel">受取後：</div>
+      <div class="gs-cardValue"><span id="recvToAfter">-</span></div>
+    </div>
+  </div>
+
+  <div class="gs-row">
+    <button class="gs-btn gs-btnPrimary" id="btnRecvCheck" onclick="checkReceive()">確認</button>
+  </div>
+</div>
+
+<!-- =========================
+     逆転条件（ボトムシート）
+========================= -->
+<div id="gyakuOverlay" class="ts-overlay hidden" onclick="closeGyakuSheet()"></div>
+
+<div id="gyakuSheet" class="ts-sheet hidden" role="dialog" aria-modal="true">
+  <div class="ts-handle"></div>
+
+  <div class="ts-header">
+    <div class="ts-title">逆転条件</div>
+    <button class="ts-close" onclick="closeGyakuSheet()">✕</button>
+  </div>
+
+  <!-- ★ここから下だけスクロールさせる -->
+  <div class="ts-body" id="gyakuBody">
+
+    <!-- 023: 親/子（自分の立場） -->
+    <div class="gs-card">
+      <div style="font-weight:900; margin-bottom:6px;">自分の立場</div>
+      <label style="margin-left:12px;"><input type="radio" name="gySelfRole" value="child">子</label>
+      <label><input type="radio" name="gySelfRole" value="parent">親</label>
+      <div style="margin-top:6px; font-size:12px; opacity:.8;">
+        切替で逆転条件を再計算します
+      </div>
+      <div class="gs-cardRow">
+        <div class="gs-cardLabel">トップ：</div>
+        <div class="gs-cardValue">
+          <span id="gyName">-</span>
+        </div>
+      </div>
+      <div class="gs-cardRow">
+        <div class="gs-cardLabel">自分：</div>
+        <div class="gs-cardValue">
+          <span id="gyMyName">-</span>
+        </div>
+      </div>
+
+      <div class="gs-cardRow">
+        <div class="gs-cardLabel">点差：</div>
+        <div class="gs-cardValue">
+          <span id="gyDiff">-</span>
+        </div>
+      </div>
+
+      <div class="gs-cardRow">
+        <div class="gs-cardLabel">リーチ棒：</div>
+        <div class="gs-cardValue">
+          <span id="gyRiichiStickCount">-</span>
+          <span id="gyRiichiPoint">-</span>
+        </div>
+      </div>
+      <div style="margin-top:6px; font-size:12px; opacity:.8;">
+        ※リーチ棒（供託）も含めて算出されます。
+      </div>
+
+    </div>
+    <!-- 直撃（ロン） -->
+    <div class="gs-card">
+      <div style="font-weight:900; margin-bottom:6px;">直撃の場合</div>
+      <div class="gy-subCard">
+   
+        <div style="font-weight:800; margin-bottom:6px;">同卓</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue"><span id="gyRonNeed">-</span></div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonMeBefore">-</span> → <span id="gyRonMeAfter">-</span>
+            <span id="gyRonMeDelta" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">トップ：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonTopBefore">-</span> → <span id="gyRonTopAfter">-</span>
+            <span id="gyRonTopDelta" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+   
+      <!-- ★3麻4人回し：抜け番（ロン） -->
+      <div id="gyRonNuke" class="gy-subCard hidden" style="margin-top:10px;">
+        <div style="font-weight:800; margin-bottom:6px;">相手が抜け番</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonNeed_nuke">-</span>
+            <span style="font-size:12px; opacity:.7;"></span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonMeBefore_nuke">-</span> → <span id="gyRonMeAfter_nuke">-</span>
+            <span id="gyRonMeDelta_nuke" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel"><span id="gyRonTopName">TOP</span>：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonTopBefore_nuke">-</span> → <span id="gyRonTopAfter_nuke">-</span>
+            <span id="gyRonTopDelta_nuke" class="gy-delta">（±0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel"><span id="gyRonOther1Name">その他①</span>：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonOther1Before">-</span> → <span id="gyRonOther1After">-</span>
+            <span id="gyRonOther1Delta" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel"><span id="gyRonOther2Name">その他②</span>：</div>
+          <div class="gs-cardValue">
+            <span id="gyRonOther2Before">-</span> → <span id="gyRonOther2After">-</span>
+            <span id="gyRonOther2Delta" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ツモ -->
+    <div class="gs-card">
+      <div style="font-weight:900; margin-bottom:6px;">ツモの場合</div>
+
+      <!-- 自分=子のとき：相手が親の場合 -->
+      <div id="gyTsumoVsParent" class="gy-subCard hidden">
+        <div style="font-weight:800; margin-bottom:6px;">相手が親の場合</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue"><span id="gyTsumoNeed_vsParent">-</span></div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoMeBefore_vsParent">-</span> → <span id="gyTsumoMeAfter_vsParent">-</span>
+            <span id="gyTsumoMeDelta_vsParent" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">トップ：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoTopBefore_vsParent">-</span> → <span id="gyTsumoTopAfter_vsParent">-</span>
+            <span id="gyTsumoTopDelta_vsParent" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 自分=子のとき：相手が子の場合 / 自分=親のとき：このブロックだけ表示 -->
+      <div id="gyTsumoVsChild" class="gy-subCard">
+        <div style="font-weight:800; margin-bottom:6px;">相手が子の場合</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue"><span id="gyTsumoNeed_vsChild">-</span></div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoMeBefore_vsChild">-</span> → <span id="gyTsumoMeAfter_vsChild">-</span>
+            <span id="gyTsumoMeDelta_vsChild" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">トップ：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoTopBefore_vsChild">-</span> → <span id="gyTsumoTopAfter_vsChild">-</span>
+            <span id="gyTsumoTopDelta_vsChild" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3麻4人回し：抜け番（必要なら表示） -->
+      <div id="gyTsumoNuke" class="gy-subCard hidden">
+        <div style="font-weight:800; margin-bottom:6px;">相手が抜け番</div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">条件：</div>
+          <div class="gs-cardValue"><span id="gyTsumoNeed_nuke">-</span></div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">自分：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoMeBefore_nuke">-</span> → <span id="gyTsumoMeAfter_nuke">-</span>
+            <span id="gyTsumoMeDelta_nuke" class="gy-delta">（+0）</span>
+          </div>
+        </div>
+
+        <div class="gs-cardRow">
+          <div class="gs-cardLabel">トップ：</div>
+          <div class="gs-cardValue">
+            <span id="gyTsumoTopBefore_nuke">-</span> → <span id="gyTsumoTopAfter_nuke">-</span>
+            <span id="gyTsumoTopDelta_nuke" class="gy-delta negative">（-0）</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /ツモカード -->
+
+  </div><!-- /ts-body -->
+</div><!-- /gyakuSheet -->
+
+
+
+
+<!-- =========================
+     履歴（縦スクロール）
+========================= -->
+<div id="historyOverlay" class="ts-overlay hidden" onclick="closeHistorySheet()"></div>
+
+<div id="historySheet" class="ts-sheet hidden" role="dialog" aria-modal="true">
+  <div class="ts-handle"></div>
+
+  <div class="ts-header">
+    <div class="ts-title">履歴</div>
+    <button class="ts-close" onclick="closeHistorySheet()">×</button>
+  </div>
+
+  <div id="historyList" class="historyList"></div>
+</div>
+
+
+<!-- ========================================= -->
+<!-- 集計中画面 -->
+<!-- ========================================= -->
+<div id="calculatingScreen" class="hidden">
+  <h2>集計</h2>
+
+  <!-- 006（上） -->
+  <div id="calcTopName" style="text-align:center; margin-bottom:10px;">-</div>
+
+  <!-- 002（上のボタン） -->
+  <div style="text-align:center; margin-bottom:6px;">
+    <button id="btnYakitoriTop" class="yakitoriBtn" onclick="toggleYakitoriByPos('N')">
+      <img class="yakitoriBtnImg" src="image/yakitori_off.png" alt="ヤキトリ">
+    </button>
+  </div>
+
+  <!-- 010（上のスコア表示） -->
+  <div id="calcTopScore" style="text-align:center; margin-bottom:18px;">-</div>
+
+  <!-- 左右（001/003 ボタン、005/007 名前、009/011 スコア） -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin:16px 0;">
+    <div style="width:40%; text-align:left;">
+      <div id="calcLeftName">-</div> <!-- 005 -->
+      <!-- 左 -->
+        <button id="btnYakitoriLeft" class="yakitoriBtn" onclick="toggleYakitoriByPos('W')">
+          <img class="yakitoriBtnImg" src="image/yakitori_off.png" alt="ヤキトリ">
+        </button>
+      <div id="calcLeftScore">-</div> <!-- 009 -->
+    </div>
+
+    <div style="width:40%; text-align:right;">
+      <div id="calcRightName">-</div> <!-- 007 -->
+        <!-- 右 -->
+        <button id="btnYakitoriRight" class="yakitoriBtn" onclick="toggleYakitoriByPos('S')">
+          <img class="yakitoriBtnImg" src="image/yakitori_off.png" alt="ヤキトリ">
+        </button>
+      <div id="calcRightScore">-</div> <!-- 011 -->
+    </div>
+  </div>
+
+  <!-- 自分（008 名前 / 004 ヤキトリボタン / 012 スコア） -->
+  <div style="text-align:center; margin-top:20px;">
+    <div id="calcMyName">-</div> <!-- 008 -->
+      <!-- 自分 -->
+      <button id="btnYakitoriMe" class="yakitoriBtn" onclick="toggleYakitoriByPos('ME')">
+        <img class="yakitoriBtnImg" src="image/yakitori_off.png" alt="ヤキトリ">
+      </button>
+    <div id="calcMyScore" style="margin-top:6px;">-</div> <!-- 012 -->
+  </div>
+
+  <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+    <button id="btnCalcEnd" onclick="finishCalculating()">集計完了</button> <!-- 013 -->
+    <button onclick="backToRoomList()">ルーム一覧へ戻る</button> <!-- 014 -->
+  </div>
+</div>
+
+<!-- ========================================= -->
+<!-- 対局終了画面 -->
+<!-- ========================================= -->
+<div id="endScreen" class="hidden">
+  <h2>対局終了</h2>
+
+  <div style="margin-bottom:12px;">
+    ルール：<button id="endRuleBtn" disabled>-</button> <!-- 001 -->
+    <div>原点：<span id="endStartPoint">-</span></div>  <!-- 002 -->
+    <div>返し点：<span id="endReturnPoint">-</span></div> <!-- 003 -->
+  </div>
+
+  <!-- 順位表示 -->
+  <div id="endRankGrid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; text-align:center;">
+    <!-- 1位 -->
+    <div>
+      <div>1位</div>
+      <div id="rank1Name">-</div>  <!-- 004 -->
+      <div id="rank1Score">-</div> <!-- 008 -->
+      <div id="rank1Yakitori"></div> <!-- 012 -->
+    </div>
+
+    <!-- 2位 -->
+    <div>
+      <div>2位</div>
+      <div id="rank2Name">-</div>  <!-- 005 -->
+      <div id="rank2Score">-</div> <!-- 009 -->
+      <div id="rank2Yakitori"></div> <!-- 013 -->
+    </div>
+
+    <!-- 3位 -->
+    <div>
+      <div>3位</div>
+      <div id="rank3Name">-</div>  <!-- 006 -->
+      <div id="rank3Score">-</div> <!-- 010 -->
+      <div id="rank3Yakitori"></div> <!-- 014 -->
+    </div>
+
+    <!-- 4位 -->
+    <div id="rank4Box">
+      <div>4位</div>
+      <div id="rank4Name">-</div>  <!-- 007 -->
+      <div id="rank4Score">-</div> <!-- 011 -->
+      <div id="rank4Yakitori"></div> <!-- 015 -->
+    </div>
+  </div>
+
+  <div style="margin-top:18px; text-align:center;">
+    <!-- ★追加：履歴ボタン -->
+    <button id="btnEndHistory" onclick="openEndHistorySheet()">履歴</button>
+
+    <div style="height:10px;"></div>
+
+    <button onclick="backToRoomList()">ルーム一覧へ戻る</button> <!-- 016 -->
+  </div>
+</div>
+
+
+<script>
+// ============================================
+//                  スクリプト
+// ================= Firebase =================
+if (!window.firebaseConfig && typeof firebaseConfig === "undefined") {
+  alert("firebaseConfig が見つかりません。firebaseConfig.js を確認してください。");
+  throw new Error("firebaseConfig missing");
+}
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+firebase.initializeApp(window.firebaseConfig);
+const db = firebase.database();
+
+// ===== DOM参照を明示（idの自動グローバルに依存しない）=====
+const transferSheet   = document.getElementById("transferSheet");
+const transferOverlay = document.getElementById("transferOverlay");
+const loginScreen      = document.getElementById("loginScreen");
+const playerConfigScreen = document.getElementById("playerConfigScreen");
+const roomListScreen   = document.getElementById("roomListScreen");
+const roomCreateScreen = document.getElementById("roomCreateScreen");
+const addPlayerScreen  = document.getElementById("addPlayerScreen");
+const gameScreen       = document.getElementById("gameScreen");
+const calculatingScreen= document.getElementById("calculatingScreen");
+const endScreen        = document.getElementById("endScreen");
+const loginPass        = document.getElementById("loginPass");
+const roomList         = document.getElementById("roomList");
+const newPlayerName    = document.getElementById("newPlayerName");
+const receiveSheet    = document.getElementById("receiveSheet");
+const receiveOverlay  = document.getElementById("receiveOverlay");
+const historySheet    = document.getElementById("historySheet");
+const historyOverlay  = document.getElementById("historyOverlay");
+const historyList     = document.getElementById("historyList");
+const gyakuSheet    = document.getElementById("gyakuSheet");
+const gyakuOverlay  = document.getElementById("gyakuOverlay");
+
+const APP_STATE_KEY = "mahjong_app_state";
+
+// ============== 端末/プレイヤー紐づけ用（追加） ==============
+let myDeviceId = null;   // UUID
+let myPlayerId = null;   // deviceMapから逆引きしたplayerId
+
+// ================= 状態 =================
+let currentRoomId = null;
+let currentRule = null;
+let currentGameInfo = {
+  playerId: null,
+  direction: null,
+  status: null
+}
+let isSpectatorMode = false;
+let calcUnsub = null;
+let transferUnsub = null;
+// ★追加：stopAllSubscriptions から参照されるので上の方で宣言しておく
+let endUnsub = null;
+let statusUnsub = null;   // stopAllSubscriptionsで触ってるならこれも同様に上へ
+let gameStateUnsub = null; // 同様
+let roomsUnsub = null;     // 同様
+let entryPlayersUnsub = null; // 同様
+let historyUnsub = null;   // 同様
+let gyakuUnsub = null;     // 同様
+
+// プルダウン用
+let entryPlayers = {};
+
+const RULES = {"3":"3麻", "3r4":"3麻4人", "4":"4麻"};
+const GAME_STATUS = {"waiting": "待機","playing": "対局", "calculating": "集計", "end":"終了"}
+
+// 全画面非表示
+function hideAllScreens() {
+  loginScreen.classList.add("hidden");
+  playerConfigScreen?.classList.add("hidden");
+  roomListScreen.classList.add("hidden");
+  roomCreateScreen?.classList.add("hidden");
+  addPlayerScreen.classList.add("hidden");
+  gameScreen.classList.add("hidden");
+  calculatingScreen.classList.add("hidden");
+  endScreen.classList.add("hidden");
+
+  // ★追加
+  document.getElementById("playerConfigScreen")?.classList.add("hidden");
+}
+
+// 画面表示
+function showScreen(id) {
+  hideAllScreens();
+  document.getElementById(id)?.classList.remove("hidden");
+  saveAppState(id); // 画面IDをそのまま保存してOK（後で復帰）
+}
+
+// ================= ログイン =================
+async function login() {
+  const pass = (loginPass?.value ?? "").trim();
+
+  if (!pass) {
+    alert("パスワードを入力してください");
+    return;
+  }
+
+  try {
+    const snap = await db.ref("systemConfig/loginPass").once("value");
+
+    if (!snap.exists()) {
+      alert("DBに systemConfig/loginPass が存在しません。パスを確認してください。");
+      return;
+    }
+
+    const dbPass = String(snap.val() ?? "").trim();
+
+    // ★型違い（数値/文字列）でも一致できるように String 比較
+    if (dbPass !== String(pass)) {
+      alert("パスワードが違います。");
+      return;
+    }
+
+    // 成功
+    await bootstrapAfterLogin();
+
+  } catch (e) {
+    console.error("login error:", e);
+    alert("Firebase読み取りに失敗しました。コンソールの login error を見てください。\n" + (e?.message ?? e));
+  }
+}
+
+
+async function bootstrapAfterLogin() {
+  loginScreen.classList.add("hidden");
+  // 1) deviceId取得
+  myDeviceId = getOrCreateDeviceId();
+  if (!myDeviceId) {
+    // まずここはほぼ起きないが念のため
+    myPlayerId = null;
+    await openPlayerConfigScreen("deviceIdが取得できません。再読み込みしてください。");
+    return;
+  }
+
+  // 2) deviceMap/{deviceId} を参照
+  const snap = await db.ref(`deviceMap/${myDeviceId}`).once("value");
+  const map = snap.val();
+
+  // 3) playerId取れればルーム一覧へ、取れなければプレイヤー設定へ
+  if (map && map.playerId) {
+    myPlayerId = map.playerId;
+    showRoomListScreen();
+    return;
+  }
+
+  myPlayerId = null;
+  await openPlayerConfigScreen("");
+}
+
+const DEVICE_ID_KEY = "mahjong_device_id";
+
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (id) return id;
+
+  // crypto.randomUUID が使えるならそれを使う
+  if (crypto?.randomUUID) {
+    id = crypto.randomUUID();
+  } else {
+    // フォールバック（十分ユニーク）
+    id = "xxxxxxxxyxxx4xxxyxxxxyxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  localStorage.setItem(DEVICE_ID_KEY, id);
+  return id;
+}
+
+async function openPlayerConfigScreen(msg) {
+  showScreen("playerConfigScreen");
+
+  const msgEl = document.getElementById("playerConfigMsg");
+  if (msgEl) msgEl.textContent = msg || "";
+
+  // entryPlayersをロードしてプルダウン作る
+  const snap = await db.ref("systemConfig/entryPlayers").once("value");
+  const list = snap.val() || {};
+
+  const sel = document.getElementById("playerConfigSelect");
+  sel.innerHTML = "";
+
+  // 1件も無い場合
+  const keys = Object.keys(list);
+  if (keys.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "プレイヤーが未登録です";
+    sel.appendChild(opt);
+    document.getElementById("btnPlayerConfigDone").disabled = true;
+    return;
+  }
+
+  document.getElementById("btnPlayerConfigDone").disabled = false;
+
+  // option作成
+  for (const pid of keys) {
+    const opt = document.createElement("option");
+    opt.value = pid;
+    opt.textContent = list[pid]?.name ?? pid;
+    sel.appendChild(opt);
+  }
+}
+
+async function completePlayerConfig() {
+  const sel = document.getElementById("playerConfigSelect");
+  let pid = sel?.value;
+
+  if (!pid) {
+    document.getElementById("playerConfigMsg").textContent = "プレイヤーを選択してください。";
+    return;
+  }
+
+  pid = String(pid).trim(); // ★念のため（空白混入対策）
+
+  myDeviceId = myDeviceId || getOrCreateDeviceId();
+  if (!myDeviceId) {
+    document.getElementById("playerConfigMsg").textContent = "deviceIdを取得できません。";
+    return;
+  }
+
+  try {
+    // 1) pid に一致する deviceMap/{deviceId} を全件取得
+    const snap = await db
+      .ref("deviceMap")
+      .orderByChild("playerId")
+      .equalTo(pid)
+      .once("value");
+
+    // 2) 一致した deviceId ノードを全部削除（deviceMap/{deviceId} = null）
+    if (snap.exists()) {
+      const updates = {};
+      snap.forEach(child => {
+        const deviceId = child.key;
+        if (!deviceId) return;
+        updates[`deviceMap/${deviceId}`] = null; // ★ノード丸ごと削除
+      });
+
+      // 重要：update対象があるときだけ叩く
+      if (Object.keys(updates).length) {
+        await db.ref().update(updates);
+      }
+    }
+
+    // 3) その後に登録（これで最終的に myDeviceId のみ残る）
+    await db.ref(`deviceMap/${myDeviceId}`).set({
+      playerId: pid,
+      updatedAt: Date.now(),
+      lastRoomId: null
+    });
+
+    myPlayerId = pid;
+    try { updateMyPlayerLabel?.(); } catch {}
+    showRoomListScreen();
+
+  } catch (e) {
+    console.error("completePlayerConfig error:", e);
+    document.getElementById("playerConfigMsg").textContent =
+      `処理に失敗しました: ${e?.message || e}`;
+  }
+}
+
+
+let addPlayerReturnTo = null; // "playerConfig" or "playerSetup"
+
+function openAddPlayerFromPlayerConfig() {
+  addPlayerReturnTo = "playerConfig";
+  showScreen("addPlayerScreen");
+}
+
+function openAddPlayer() {
+  // 既存の参加者設定画面から呼ぶ場合
+  addPlayerReturnTo = "playerSetup";
+  addPlayerScreen.classList.remove("hidden");
+  saveAppState("addPlayerScreen");
+}
+
+function backToPlayerSetup() {
+  addPlayerScreen.classList.add("hidden");
+
+  if (addPlayerReturnTo === "playerConfig") {
+    openPlayerConfigScreen("");
+    return;
+  }
+}
+
+function goRoomList() {
+  // プレイヤー設定から戻るボタン用
+  showRoomListScreen();
+}
+
+
+// ================= ルーム一覧 =================
+function loadRooms() {
+  roomList.innerHTML = "";
+
+  // ヘッダー
+  const header = document.createElement("div");
+  header.style.fontWeight = "bold";
+  header.style.display = "flex";
+  header.style.gap = "10px";
+  header.innerHTML = `
+    <div style="width:150px;">ルームID</div>
+    <div style="width:100px;">ルール</div>
+    <div style="width:100px;">状態</div>
+    <div style="width:100px;">待機人数</div>
+    <div style="flex:1;">操作</div>
+  `;
+  roomList.appendChild(header);
+}
+
+
+// ===== ルーム一覧リアルタイム購読 =====
+let roomsCache = {};
+
+function subscribeRooms() {
+  const ref = db.ref("rooms");
+
+  if (roomsUnsub) roomsUnsub();
+
+  const handler = (snap) => {
+    try {
+      const rooms = snap.val() || {};
+      renderRoomList(rooms);
+      if (roomList.children.length === 0) { // headerしかない
+        const div = document.createElement("div");
+        div.style.padding = "8px 0";
+        div.textContent = "ルームがありません（または表示対象ステータスがありません）";
+        roomList.appendChild(div);
+      }
+    } catch (e) {
+      console.error("renderRoomList error:", e);
+      alert("ルーム一覧描画でエラー。コンソールを確認してください。");
+    }
+  };
+
+  const onError = (err) => {
+    console.error("rooms subscribe error:", err);
+    alert("rooms の読み取りに失敗しました。DB権限やパスを確認してください。");
+  };
+
+  ref.on("value", handler, onError);
+  roomsUnsub = () => ref.off("value", handler);
+
+  ref.once("value").then(handler).catch(onError);
+}
+
+function renderRoomList(rooms) {
+  roomsCache = rooms || {};
+
+  // ★行一覧はここに描く（スクロール領域）
+  roomList.innerHTML = "";
+
+  // ★列ヘッダーは固定領域へ
+  const headerHost = document.getElementById("roomListTableHeader");
+  if (headerHost) headerHost.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "roomListHeader";
+  header.innerHTML = `
+    <div class="roomCell">ルームID</div>
+    <div class="roomCell">ルール</div>
+    <div class="roomCell">状態</div>
+    <div class="roomCell">参加者</div>
+    <div class="roomCell">操作</div>
+  `;
+  if (headerHost) headerHost.appendChild(header);
+
+  const statusAllow = ["waiting","playing","calculating","end"];
+  const statusOrder = { waiting:0, playing:1, calculating:2, end:3 };
+
+  // direction -> pid を探す
+  const findPidByDir = (playersObj, dir) => {
+    if (!playersObj) return null;
+    for (const [pid, p] of Object.entries(playersObj)) {
+      if (p?.direction === dir) return pid;
+    }
+    return null;
+  };
+
+  const nameByPid = (pid) => {
+    if (!pid) return "-";
+    return entryPlayers?.[pid]?.name ?? pid;
+  };
+
+  // ============================
+  // ★ソート（status順 → ルームID昇順）
+  // ============================
+  const entries = Object.entries(roomsCache)
+    .map(([id, r]) => {
+      const status = r?.gameConfig?.status ?? "-";
+      return { id, r: r || {}, status };
+    })
+    .filter(x => statusAllow.includes(x.status))
+    .sort((a, b) => {
+      const ao = statusOrder[a.status] ?? 99;
+      const bo = statusOrder[b.status] ?? 99;
+      if (ao !== bo) return ao - bo;
+
+      // 第2条件：ルームID 昇順（文字列でOK）
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+  // 行を描画
+  for (const x of entries) {
+    const id = x.id;
+    const r = x.r;
+    const status = x.status;
+
+    const ruleText = RULES[r.gameConfig?.rule] || r.gameConfig?.rule || "-";
+    const stText   = GAME_STATUS[status] || status;
+
+    const pidE = findPidByDir(r.players, "東");
+    const pidS = findPidByDir(r.players, "南");
+    const pidW = findPidByDir(r.players, "西");
+    const pidN = findPidByDir(r.players, "北");
+
+    const row = document.createElement("div");
+    row.className = "roomListRow";
+
+    const btnEnter = (["waiting","playing","calculating"].includes(status))
+      ? `<button onclick="enterRoom('${id}')">入室</button>` : "";
+
+    const btnResult = (status === "end")
+      ? `<button onclick="enterRoom('${id}')">結果</button>` : "";
+
+    const btnDelete = (status === "waiting")
+      ? `<button onclick="deleteRoom('${id}')">削除</button>` : "";
+
+    row.innerHTML = `
+      <div class="roomCell">${id}</div>
+      <div class="roomCell">${ruleText}</div>
+      <div class="roomCell">${stText}</div>
+
+      <div class="roomCell">
+        <div>${nameByPid(pidE)}</div>
+        <div>${nameByPid(pidS)}</div>
+        <div>${nameByPid(pidW)}</div>
+        <div>${nameByPid(pidN)}</div>        
+      </div>
+
+      <div class="roomCell">
+        <div class="ops">
+          ${btnEnter}
+          ${btnResult}
+          ${btnDelete}
+        </div>
+      </div>
+    `;
+
+    roomList.appendChild(row);
+  }
+
+  // 0件のとき
+  if (entries.length === 0) {
+    const div = document.createElement("div");
+    div.style.padding = "8px 0";
+    div.textContent = "ルームがありません（または表示対象ステータスがありません）";
+    roomList.appendChild(div);
+  }
+}
+
+
+
+// entryPlayers をリアルタイム購読する関数
+function subscribeEntryPlayers() {
+  const ref = db.ref("systemConfig/entryPlayers");
+
+  if (entryPlayersUnsub) entryPlayersUnsub();
+
+  const handler = (snap) => {
+    entryPlayers = snap.val() || {};
+    // ルーム一覧が出ているなら再描画
+    renderRoomList(roomsCache);
+    updateMyPlayerLabel();   // ★追加
+  };
+
+  ref.on("value", handler);
+  entryPlayersUnsub = () => ref.off("value", handler);
+
+  ref.once("value").then(handler).catch(e => console.error("entryPlayers load error:", e));
+}
+
+// 購読開始
+function showRoomListScreen() {
+  showScreen("roomListScreen");
+  subscribeEntryPlayers();   // ★追加
+  subscribeRooms();
+  updateMyPlayerLabel();   // ★追加（entryPlayers未読込でも後で上書きされる）
+}
+
+
+function updateMyPlayerLabel() {
+  const el = document.getElementById("myPlayerLabel");
+  if (!el) return;
+
+  if (!myPlayerId) {
+    el.textContent = "";
+    return;
+  }
+
+  const name = entryPlayers?.[myPlayerId]?.name;
+  el.textContent = name ? `👤 ${name}` : "";
+}
+
+// ---------------------------
+// ルーム作成画面（新規）
+// ---------------------------
+const createSeatIds = [
+  ["東", "createSeatE"],
+  ["南", "createSeatS"],
+  ["西", "createSeatW"],
+  ["北", "createSeatN"],
+];
+
+function openRoomCreateScreen() {
+  showScreen("roomCreateScreen");
+  loadEntryPlayersForCreate();
+}
+
+async function loadEntryPlayersForCreate() {
+  const msgEl = document.getElementById("roomCreateMsg");
+  if (msgEl) msgEl.textContent = "";
+
+  const snap = await db.ref("systemConfig/entryPlayers").once("value");
+  const list = snap.val() || {};
+
+  // option生成（全席共通）
+  for (const [, selId] of createSeatIds) {
+    const sel = document.getElementById(selId);
+    if (!sel) continue;
+
+    sel.innerHTML = "";
+
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "未選択";
+    sel.appendChild(opt0);
+
+    for (const [pid, p] of Object.entries(list)) {
+      const opt = document.createElement("option");
+      opt.value = pid;
+      opt.textContent = p?.name ?? pid;
+      sel.appendChild(opt);
+    }
+
+    sel.addEventListener("change", validateCreateRoomForm);
+  }
+
+  // ルール/点数も変更時に検証
+  document.querySelectorAll("input[name=create_rule]").forEach(r => {
+    r.addEventListener("change", validateCreateRoomForm);
+  });
+  document.getElementById("createStartPoint")?.addEventListener("input", validateCreateRoomForm);
+  document.getElementById("createReturnPoint")?.addEventListener("input", validateCreateRoomForm);
+
+  validateCreateRoomForm();
+}
+
+function getCreateRule() {
+  return document.querySelector("input[name=create_rule]:checked")?.value || "3";
+}
+
+function validateCreateRoomForm() {
+  const rule = getCreateRule();
+  const need = (rule === "3") ? 3 : 4;
+
+  const start = parseInt(document.getElementById("createStartPoint")?.value, 10) || 0;
+  const ret   = parseInt(document.getElementById("createReturnPoint")?.value, 10) || 0;
+
+  const picks = [];
+  for (const [dir, selId] of createSeatIds) {
+    const v = document.getElementById(selId)?.value || "";
+    if (v) picks.push({ dir, pid: v });
+  }
+
+  const msgEl = document.getElementById("roomCreateMsg");
+  const btn = document.getElementById("btnCreateRoomDo");
+
+  // 原点 <= 返し点
+  if (start > ret) {
+    if (msgEl) msgEl.textContent = "原点は返し点以下にしてください。";
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  // 重複チェック
+  const ids = picks.map(x => x.pid);
+  const unique = new Set(ids);
+  if (unique.size !== ids.length) {
+    if (msgEl) msgEl.textContent = "同じプレイヤーが複数席にいます。";
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  // 人数チェック
+  if (picks.length !== need) {
+    if (msgEl) msgEl.textContent = `席を${need}人分選択してください。`;
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  if (msgEl) msgEl.textContent = "";
+  if (btn) btn.disabled = false;
+}
+
+async function createRoomFromCreateScreen() {
+  validateCreateRoomForm();
+  const btn = document.getElementById("btnCreateRoomDo");
+  if (btn?.disabled) return;
+
+  const rule = getCreateRule();
+  const startPoint  = parseInt(document.getElementById("createStartPoint")?.value, 10) || 45000;
+  const returnPoint = parseInt(document.getElementById("createReturnPoint")?.value, 10) || 50000;
+
+  // 選択席を集める
+  const selected = [];
+  for (const [dir, selId] of createSeatIds) {
+    const pid = document.getElementById(selId)?.value || "";
+    if (pid) selected.push({ dir, pid });
+  }
+
+  const need = (rule === "3") ? 3 : 4;
+  if (selected.length !== need) return;
+
+  // ルームID（既存と同じ形式）
+  const d = new Date();
+  const pad = (n) => n.toString().padStart(2, "0");
+  const roomId = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+
+  // players を組み立て
+  const playersObj = {};
+  for (const x of selected) {
+    playersObj[x.pid] = {
+      direction: x.dir,
+      status: "waiting",
+      point: startPoint,
+      score: null,
+      yakitoriFlg: true
+    };
+  }
+
+  await db.ref(`rooms/${roomId}`).set({
+    gameConfig: {
+      startPoint,
+      returnPoint,
+      rule,
+      status: "waiting",
+      riichiStickCount: 0,
+      createdAt: firebase.database.ServerValue.TIMESTAMP
+    },
+    players: playersObj,
+    transferRequests: {}
+  });
+
+  // 作ったら一覧へ
+  backToRoomList();
+}
+
+// 時刻ユニークID生成
+function genTransferRequestId(){
+  const d = new Date();
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const pad3 = (n) => String(n).padStart(3, "0");
+
+  const ymd = `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}`;
+  const hms = `${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
+  const ms  = pad3(d.getMilliseconds());
+  const rnd = pad3(Math.floor(Math.random() * 1000));
+
+  return `${ymd}_${hms}_${ms}_${rnd}`;
+}
+
+
+// 参加者設定処理（入室）
+// deviceId -> myPlayerId を元に、自分のdirectionを確定して描画する
+async function enterRoom(id) {
+  try {
+    stopAllSubscriptions?.();
+    historyCache = [];
+    if (historyUnsub) { historyUnsub(); historyUnsub = null; }
+
+    currentRoomId = id;
+
+    if (!myPlayerId) {
+      await openPlayerConfigScreen("プレイヤー設定が未完了です。先にプレイヤー設定を行ってください。");
+      return;
+    }
+
+    const roomSnap = await db.ref(`rooms/${id}`).once("value");
+    if (!roomSnap.exists()) {
+      alert("ルームが存在しません。");
+      backToRoomList();
+      return;
+    }
+
+    const room = roomSnap.val() || {};
+    const gameConfig = room.gameConfig || {};
+    const players = room.players || {};
+
+    currentRule = gameConfig.rule || null;
+
+    const my = players[myPlayerId];
+
+    console.log("[enterRoom]", {
+      myPlayerId,
+      playersKeys: Object.keys(players || {}),
+      hasMe: !!players?.[myPlayerId],
+      my: players?.[myPlayerId],
+    });
+
+    // ===== 観戦判定 =====
+    if (!my || !my.direction) {
+      // 観戦モード
+      isSpectatorMode = true;
+
+      currentGameInfo.playerId = null;     // 観戦は自分pid無し
+      currentGameInfo.direction = "東";    // 観戦の基準方角（相対変換用に使う場合の保険）
+      currentGameInfo.status = "spectating";
+
+      // 状態に応じて画面へ（観戦でも same）
+      const roomStatus = gameConfig.status || "waiting";
+
+      if (roomStatus === "calculating") {
+        openCalculatingScreen();
+        saveAppState("calculatingScreen");
+        return;
+      }
+
+      if (roomStatus === "end") {
+        openEndScreen();
+        saveAppState("endScreen");
+        return;
+      }
+
+      openGameScreen();
+      saveAppState("gameScreen");
+      return;
+    }
+
+    // ===== 通常参加 =====
+    isSpectatorMode = false;
+
+    currentGameInfo.playerId = myPlayerId;
+    currentGameInfo.direction = my.direction;
+    currentGameInfo.status = my.status || "waiting";
+
+    const roomStatus = gameConfig.status || "waiting";
+
+    // ★追加：入室したら waiting → playing に更新
+    await ensurePlayingOnEnter(id, myPlayerId);
+
+    // （ここから既存の分岐）
+    saveAppState("enterRoom");
+
+    if (roomStatus === "calculating") {
+      openCalculatingScreen();
+      saveAppState("calculatingScreen");
+      return;
+    }
+
+    if (roomStatus === "end") {
+      openEndScreen();
+      saveAppState("endScreen");
+      return;
+    }
+
+    openGameScreen();
+    saveAppState("gameScreen");
+    if (entryPlayersUnsub) entryPlayersUnsub();
+
+  } catch (e) {
+    console.error("enterRoom error:", e);
+    alert("入室処理でエラーが発生しました。コンソールを確認してください。\n" + (e?.message ?? e));
+    backToRoomList();
+  }
+}
+
+// status変更判定
+// status変更判定（最後の人が押した時だけ roomStatus を playing にする）
+async function ensurePlayingOnEnter(roomId, playerId) {
+  if (!roomId || !playerId) return;
+
+  const playerStatusRef = db.ref(`rooms/${roomId}/players/${playerId}/status`);
+  const roomStatusRef   = db.ref(`rooms/${roomId}/gameConfig/status`);
+
+  try {
+    // 1) 自分status確認 → waiting なら playing にする
+    const pSnap = await playerStatusRef.once("value");
+    const pStatus = pSnap.val();
+
+    let becamePlayingNow = false;
+    if (pStatus === "waiting") {
+      await playerStatusRef.set("playing");
+      becamePlayingNow = true;
+    }
+
+    // 2) players / gameConfig / roomStatus を取得
+    const [playersSnap, configSnap, rSnap] = await Promise.all([
+      db.ref(`rooms/${roomId}/players`).once("value"),
+      db.ref(`rooms/${roomId}/gameConfig`).once("value"),
+      roomStatusRef.once("value"),
+    ]);
+
+    const players = playersSnap.val() || {};
+    const gameConfig = configSnap.val() || {};
+    const rStatus = rSnap.val();
+
+    // 3) 参加人数（3麻/4麻）を決める
+    const need = (String(gameConfig.rule) === "3") ? 3 : 4;
+
+    // 4) 参加者のみ（directionがある人）を対象に playing 数を数える
+    const playingCount =
+      Object.values(players)
+        .filter(p => p?.direction)      // 参加者のみ
+        .filter(p => p?.status === "playing")
+        .length
+      + (becamePlayingNow ? 1 : 0);     // 今回自分が playing になった分を加算（snapが更新前の可能性があるため）
+
+    // 5) roomStatus は「最後の人が押した時だけ」 waiting → playing にする
+    if (rStatus === "waiting" && playingCount >= need) {
+      await roomStatusRef.set("playing");
+      alert("対局開始します。");
+    }
+
+  } catch (e) {
+    console.error("ensurePlayingOnEnter error:", e);
+    alert("状態更新に失敗しました。\n" + (e?.message ?? e));
+  }
+}
+
+
+
+
+// 観戦時は操作を無効化
+function applySpectatorLockUI() {
+  const btnBack = Array.from(gameScreen.querySelectorAll("button"))
+    .find(b => (b.textContent || "").includes("ルーム一覧へ戻る"));
+
+  const disableIds = ["btnRiichiAdd", "btnRiichiTake", "btnEndGame", "btnConfirm", "btnCancel"];
+  for (const id of disableIds) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = true;
+  }
+
+  // 支払ボトムシートを開かせない（残ってたら閉じる）
+  try { closeTransferSheet(); } catch {}
+
+  // 観戦中はボトムシート自体触れないように（任意）
+  if (transferOverlay) transferOverlay.classList.add("hidden");
+  if (transferSheet) transferSheet.classList.add("hidden");
+
+  // 「戻る」以外のボタンも全部無効化（保険）
+  const allButtons = Array.from(gameScreen.querySelectorAll("button"));
+  for (const b of allButtons) {
+    if (btnBack && b === btnBack) continue;
+    // 戻る以外 disable
+    b.disabled = true;
+  }
+}
+
+
+
+// ================= プレイヤー追加 =================
+function openAddPlayerFromRoomList() {
+  addPlayerReturnTo = "roomList";
+  showScreen("addPlayerScreen");
+}
+
+function addPlayer() {
+  const name = newPlayerName.value.trim();
+  if (!name) return;
+
+  const id = "p" + Date.now();
+  db.ref(`systemConfig/entryPlayers/${id}`).set({ name }).then(() => {
+    newPlayerName.value = "";
+    backToPlayerSetup();
+  });
+}
+
+
+// ===============================
+// 対局中 画面用（一時状態）
+// ===============================
+
+let selectedRecipient = null; // 'N'|'W'|'S'
+let sendAmountValue = 0;
+
+// 方向の回転：自分がどのdirectionでも、画面上の N/W/S に相対配置する
+// 例：自分が東なら N=北 W=西 S=南（画像仕様の例と一致）
+const DIRS = ["東","南","西","北"];
+function toRelative(selfDir, otherDir) {
+  const si = DIRS.indexOf(selfDir);
+  const oi = DIRS.indexOf(otherDir);
+  if (si < 0 || oi < 0) return null;
+
+  const diff = (oi - si + 4) % 4;
+
+  // 自分を下固定：上=対面、右=次席、左=前席
+  if (diff === 1) return "S"; // 右
+  if (diff === 2) return "N"; // 上(対面)
+  if (diff === 3) return "W"; // 左
+  return null; // diff===0 は自分
+}
+
+function setText(id, text){ const el=document.getElementById(id); if(el) el.textContent = text; }
+
+function setDiff(elId, diff){
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const v = Number(diff) || 0;
+  el.textContent = (v >= 0 ? `+${v}` : `${v}`);
+  el.classList.toggle("negative", v < 0);
+}
+
+// ===============================
+// 対局画面を開く
+// ===============================
+function openGameScreen() {
+  loginScreen?.classList.add("hidden");
+  roomListScreen?.classList.add("hidden");
+  addPlayerScreen?.classList.add("hidden");
+  gameScreen.classList.remove("hidden");
+  historyCache = [];
+  if (historyUnsub) { historyUnsub(); historyUnsub = null; }
+
+  selectedRecipient = null;
+  sendAmountValue = 0;
+  setText("sendToName", "-");
+  setText("sendAmount", "0");
+
+  if (gameStateUnsub) gameStateUnsub();
+
+  const playersRef = db.ref(`rooms/${currentRoomId}/players`);
+  const configRef  = db.ref(`rooms/${currentRoomId}/gameConfig`);
+  const entryRef   = db.ref(`systemConfig/entryPlayers`);
+
+  const handler = async () => {
+    const [pSnap, cSnap, eSnap] = await Promise.all([
+      playersRef.once("value"),
+      configRef.once("value"),
+      entryRef.once("value"),
+    ]);
+    renderGameUI(pSnap.val() || {}, cSnap.val() || {}, eSnap.val() || {});
+  };
+
+  playersRef.on("value", handler);
+  configRef.on("value", handler);
+
+  gameStateUnsub = () => {
+    playersRef.off("value", handler);
+    configRef.off("value", handler);
+  };
+  // ★ここを追加（観戦は除外したいならガード）
+  if (!isSpectatorMode) subscribeTransferRequests();
+  handler();
+  subscribeRoomStatus();
+  
+}
+
+function subscribeRoomStatus() {
+  if (!currentRoomId) return;
+
+  const ref = db.ref(`rooms/${currentRoomId}/gameConfig/status`);
+  if (statusUnsub) statusUnsub();
+
+  const handler = (snap) => {
+    const st = snap.val();
+    if (st === "calculating") {
+      openCalculatingScreen();
+    }
+    if (st === "end") {
+      openEndScreen();
+    }
+  };
+
+  ref.on("value", handler);
+  statusUnsub = () => ref.off("value", handler);
+}
+
+
+// ===============================
+// 画面描画（001〜012 など）
+// ===============================
+function renderGameUI(players, gameConfig, entryPlayers){
+  // ★観戦モード
+  if (isSpectatorMode) {
+    renderSpectatorUI(players, gameConfig, entryPlayers);
+    return;
+  }
+  
+  const myPid = currentGameInfo.playerId;
+  const my = players[myPid];
+  if (!my) return; // まだDBにいない等
+
+  // 001 自分の名前
+  setText("myName", entryPlayers[myPid]?.name ?? "不明");
+
+  // 012 自分のpoint（大きく）
+  const myPoint = Number(my.point ?? 0);
+  setText("myPoint", myPoint);
+
+  // 002 リーチ棒本数
+  setText("riichiCount", Number(gameConfig.riichiStickCount ?? 0));
+
+  // 相手枠を初期化
+  const slots = { N:null, W:null, S:null };
+  for (const [pid, p] of Object.entries(players)){
+    if (!p?.direction) continue;
+    if (pid === myPid) continue;
+    const rel = toRelative(my.direction, p.direction);
+    if (rel) slots[rel] = { pid, p };
+  }
+
+  // N/W/S へ反映（003〜011）
+  // 北枠
+  renderOpponentSlot("N", slots.N, entryPlayers, myPoint);
+  // 西枠
+  renderOpponentSlot("W", slots.W, entryPlayers, myPoint);
+  // 南枠
+  renderOpponentSlot("S", slots.S, entryPlayers, myPoint);
+  // ヤキトリ
+  setYakitoriImg("yakitoriME", players?.[myPid]?.yakitoriFlg === true);
+}
+
+function renderOpponentSlot(rel, slot, entryPlayers, myPoint){
+  const nameId  = rel === "N" ? "nameN"  : rel === "W" ? "nameW"  : "nameS";
+  const pointId = rel === "N" ? "pointN" : rel === "W" ? "pointW" : "pointS";
+  const diffId  = rel === "N" ? "diffN"  : rel === "W" ? "diffW"  : "diffS";
+
+  // タップエリア（座席全体）
+  const seatSel = rel === "N" ? ".gs-north" : rel === "W" ? ".gs-west" : ".gs-south";
+  const seatEl = document.querySelector(seatSel);
+
+  // まずクリック解除（毎回上書き）
+  if (seatEl) {
+    seatEl.onclick = null;
+    seatEl.classList.remove("tapTarget");
+  }
+
+  // ヤキトリ img id
+  const yId = rel === "N" ? "yakitoriN" : rel === "W" ? "yakitoriW" : "yakitoriS";
+
+  // 空席
+  if (!slot){
+    setText(nameId, "-");
+    setText(pointId, "-");
+    setText(diffId, "-");
+    document.getElementById(yId)?.classList.add("is-hidden");
+    return;
+  }
+
+  // 席あり
+  document.getElementById(yId)?.classList.remove("is-hidden");
+
+  const { pid, p } = slot;
+
+  // ヤキトリ画像のリアルタイム反映
+  setYakitoriImg(yId, p?.yakitoriFlg === true);
+
+  const nm = entryPlayers[pid]?.name ?? "不明";
+  const pt = Number(p.point ?? 0);
+
+  setText(nameId, nm);
+  setText(pointId, pt);
+  setDiff(diffId, myPoint - pt);
+
+  // 座席全体タップで送り先選択
+  if (seatEl) {
+    seatEl.classList.add("tapTarget");
+
+    if (isSpectatorMode) {
+      seatEl.onclick = null;
+      seatEl.classList.remove("tapTarget");
+    } else {
+      seatEl.onclick = () => selectRecipient(rel);
+    }
+  }
+}
+
+
+
+
+// ===============================
+// 013 リーチ：リーチ棒+1 / 自分point-1000
+// ===============================
+async function onRiichiAdd(){
+  if (!currentRoomId) return;
+  if (isSpectatorMode) return;
+
+  const roomId = currentRoomId;
+  const myPid  = currentGameInfo.playerId;
+  if (!myPid) return;
+
+  const [cfgSnap, pSnap] = await Promise.all([
+    db.ref(`rooms/${roomId}/gameConfig`).once("value"),
+    db.ref(`rooms/${roomId}/players/${myPid}`).once("value"),
+  ]);
+
+  const cfg = cfgSnap.val() || {};
+  const me  = pSnap.val() || {};
+  const before = Number(me.point ?? 0);
+  const after  = before - 1000;
+
+  const reqId = genTransferRequestId();
+  const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
+
+  const updates = {};
+  updates[`rooms/${roomId}/gameConfig/riichiStickCount`] = Number(cfg.riichiStickCount ?? 0) + 1;
+  updates[`rooms/${roomId}/players/${myPid}/point`] = after;
+
+  // pot扱い（仕様）
+  updates[reqPath] = {
+    fromPlayerId: myPid,
+    toPlayerId: "pot",
+    point: 1000,
+    fromBefore: before,
+    fromAfter: after,
+    toBefore: null,
+    toAfter: null,
+    type: "riichi",
+    status: "checked", // ポップアップ不要なので確定扱い
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedByPlayerId: myPid
+  };
+
+  await db.ref().update(updates);
+}
+
+
+// ===============================
+// 014 リーチ棒受取：自分point += 本数*1000 / リーチ棒0
+// ===============================
+async function onRiichiTake(){
+  if (!currentRoomId) return;
+  if (isSpectatorMode) return;
+
+  const roomId = currentRoomId;
+  const myPid  = currentGameInfo.playerId;
+  if (!myPid) return;
+
+  const cfgRef = db.ref(`rooms/${roomId}/gameConfig/riichiStickCount`);
+  const [cfgSnap, meSnap] = await Promise.all([
+    cfgRef.once("value"),
+    db.ref(`rooms/${roomId}/players/${myPid}/point`).once("value"),
+  ]);
+
+  const cnt = Number(cfgSnap.val() || 0);
+  if (cnt <= 0) return;
+
+  const before = Number(meSnap.val() || 0);
+  const gain = cnt * 1000;
+  const after = before + gain;
+
+  const reqId = genTransferRequestId();
+  const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
+
+  const updates = {};
+  updates[`rooms/${roomId}/players/${myPid}/point`] = after;
+  updates[`rooms/${roomId}/gameConfig/riichiStickCount`] = 0;
+
+  // pot → 自分（受取）として履歴に残す（ポップアップ不要）
+  updates[reqPath] = {
+    fromPlayerId: "pot",
+    toPlayerId: myPid,
+    point: gain,
+    fromBefore: null,
+    fromAfter: null,
+    toBefore: before,
+    toAfter: after,
+    type: "riichi",        // 受取もriichi扱いでOK（仕様に合わせる）
+    status: "checked",
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedByPlayerId: myPid
+  };
+
+  await db.ref().update(updates);
+}
+
+
+async function checkReceive(){
+  if (!currentRoomId) return;
+  const roomId = currentRoomId;
+  const myPid = currentGameInfo.playerId;
+  if (!myPid) return;
+  if (!currentReceiveReqId) return;
+
+  const now = firebase.database.ServerValue.TIMESTAMP;
+
+  await db.ref(`rooms/${roomId}/transferRequests/${currentReceiveReqId}`).update({
+    status: "checked",
+    checkedAt: now,
+    checkedByPlayerId: myPid
+  });
+
+  closeReceiveSheet();
+}
+
+
+let historyCache = []; // 表示用（昇順）
+
+function subscribeHistory(){
+  if (!currentRoomId) return;
+  if (historyUnsub) historyUnsub();
+
+  const roomId = currentRoomId;
+  const myPid = currentGameInfo.playerId; // 観戦はnull、観戦時は履歴出さない想定ならreturn
+  if (!myPid) return;
+
+  const ref = db.ref(`rooms/${roomId}/transferRequests`);
+
+  const handler = async (snap) => {
+    const obj = snap.val();
+    if (!obj) return;
+
+    // 自分が関係あるものだけ
+    const involved = (obj.fromPlayerId === myPid || obj.toPlayerId === myPid);
+    if (!involved) return;
+
+    // キャッシュへ追加（重複防止）
+    const id = snap.key;
+    if (historyCache.some(x => x._id === id)) return;
+
+    historyCache.push({ _id: id, ...obj });
+    historyCache.sort((a,b) => Number(a.createdAt||0) - Number(b.createdAt||0));
+
+    // 表示更新
+    const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+    const ep = eSnap.val() || {};
+    renderHistoryList(ep);
+  };
+
+  ref.on("child_added", handler);
+  historyUnsub = () => ref.off("child_added", handler);
+}
+
+const transferRequestType = {
+  "payment": "支払", 
+  "riichi": "リーチ棒"
+}
+
+const transferRequestStatus = {
+  "pending": "未確認",
+  "checked": "確認済"
+} 
+
+// 履歴購読
+function renderHistoryList(entryPlayers){
+  if (!historyList) return;
+
+  const nameOf = (pid) => {
+    if (!pid) return "-";
+    if (pid === "pot") return "場";
+    return entryPlayers?.[pid]?.name ?? pid;
+  };
+
+  const fmtTime = (ts) => {
+    const t = Number(ts || 0);
+    if (!t) return "-";
+    const d = new Date(t);
+    const pad = (n)=>String(n).padStart(2,"0");
+    return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  historyList.innerHTML = "";
+
+  for (const h of historyCache){
+
+    const type = transferRequestType[h.type] || "-";
+    const status = transferRequestStatus[h.status] || "";
+
+    // ---- タイトル表示 ----
+    let badge = type;
+    if (type === transferRequestType["payment"]) {
+      badge = `${type} / ${status}`;
+    }
+
+    const from = nameOf(h.fromPlayerId);
+    const to   = nameOf(h.toPlayerId);
+
+    // ---- 名前行 ----
+    const whoLine =
+      h.fromPlayerId === "pot"
+        ? `場 → ${to}`
+        : `${from} → ${to}`;
+
+    const item = document.createElement("div");
+    item.className = "historyItem";
+
+    item.innerHTML = `
+      <div class="historyTop">
+        <div>${fmtTime(h.createdAt)}</div>
+        <div class="historyBadge">${badge}</div>
+      </div>
+
+      <div class="historyMain">
+        <div class="historyWho">${whoLine}</div>
+        <div class="historyPoint">${Number(h.point ?? 0)}</div>
+      </div>
+
+      <div class="historyMeta">
+        <div>${from}: ${h.fromPlayerId === "pot" ? "場" : (h.fromBefore ?? "-")} → ${h.fromAfter ?? "-"}</div>
+        <div>${to}: ${h.toBefore ?? "-"} → ${h.toAfter ?? "-"}</div>
+      </div>
+    `;
+
+    historyList.appendChild(item);
+  }
+
+  if (historyCache.length === 0){
+    const div = document.createElement("div");
+    div.style.opacity = ".8";
+    div.textContent = "履歴がありません。";
+    historyList.appendChild(div);
+  }
+}
+
+
+function setYakitoriImg(elId, flg){
+  const el = document.getElementById(elId);
+  if (!el) return;
+
+  // true=on / false=off
+  const src = flg ? "image/yakitori_on.png" : "image/yakitori_off.png";
+
+  // 毎回上書き（確実にリアルタイム反映）
+  if (el.src.endsWith(src) === false) el.src = src;
+  else el.src = src; // ←ここを残すと「常に上書き」で確実（好みで）
+}
+
+function flipYakitoriBtn(btnId, nextFlg) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+
+  const img = btn.querySelector(".yakitoriBtnImg");
+  if (!img) return;
+
+  // 多重クリック対策
+  if (btn.dataset.animating === "1") return;
+  btn.dataset.animating = "1";
+
+  const nextSrc = nextFlg ? "image/yakitori_on.png" : "image/yakitori_off.png";
+
+  // ひっくり返し開始
+  btn.classList.add("is-flipping");
+
+  // 半回転あたりで画像を差し替える（それっぽく見える）
+  setTimeout(() => {
+    img.src = nextSrc;
+  }, 130);
+
+  // 戻す
+  setTimeout(() => {
+    btn.classList.remove("is-flipping");
+    btn.dataset.animating = "0";
+  }, 260);
+}
+
+
+// ===============================
+// 019-021 送り先選択（常にアクティブ）
+// ===============================
+async function selectRecipient(rel){
+  // rel: 'N'|'W'|'S'
+  selectedRecipient = rel;
+  sendAmountValue = 0;
+  setText("sendAmount", "0");
+
+  // 現在の相手を解決して 015 に表示
+  const pSnap = await db.ref(`rooms/${currentRoomId}/players`).once("value");
+  const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+  const players = pSnap.val() || {};
+  const entryPlayers = eSnap.val() || {};
+
+  const myPid = currentGameInfo.playerId;
+  const my = players[myPid];
+  if (!my) return;
+
+  let targetPid = null;
+  for (const [pid, p] of Object.entries(players)){
+    if (pid === myPid) continue;
+    const r = toRelative(my.direction, p.direction);
+    if (r === rel) { targetPid = pid; break; }
+  }
+
+  setText("sendToName", targetPid ? (entryPlayers[targetPid]?.name ?? "不明") : "-");
+  openTransferSheet();
+}
+
+// ===============================
+// 022-026 金額加算（015が出ている場合に有効、という仕様に近づける）
+// ===============================
+function addAmount(amount){
+  if (!selectedRecipient) return; // 送り先未選択なら何もしない
+  sendAmountValue += amount;
+  setText("sendAmount", String(sendAmountValue));
+}
+
+// ===============================
+// 017 取消：送り先/金額リセット
+// ===============================
+function cancelAmountValue(){
+  sendAmountValue = 0;
+  setText("sendAmount", "0");
+}
+
+// ===============================
+// 017 取消：送り先/金額リセット
+// ===============================
+function cancelTransfer(){
+  selectedRecipient = null;
+  sendAmountValue = 0;
+  setText("sendToName", "-");
+  setText("sendAmount", "0");
+  closeTransferSheet();
+}
+
+
+// ===============================
+// 018 確定：自分→相手へ point 移動
+// 015 の相手に 016 の点数を移動
+// ===============================
+async function confirmTransfer(){
+  if (!selectedRecipient) return;
+  if (sendAmountValue <= 0) return;
+  if (!currentRoomId) return;
+  if (isSpectatorMode) return;
+
+  const roomId = currentRoomId;
+
+  // 現在の players と entryPlayers を取得（名前表示用は別途でOKだが、まず点数用）
+  const pSnap = await db.ref(`rooms/${roomId}/players`).once("value");
+  const players = pSnap.val() || {};
+
+  const myPid = currentGameInfo.playerId;
+  const my = players[myPid];
+  if (!my) return;
+
+  // 相手pid解決（relから）
+  let targetPid = null;
+  for (const [pid, p] of Object.entries(players)){
+    if (pid === myPid) continue;
+    const r = toRelative(my.direction, p.direction);
+    if (r === selectedRecipient) { targetPid = pid; break; }
+  }
+  if (!targetPid) return;
+
+  const fromBefore = Number(players?.[myPid]?.point ?? 0);
+  const toBefore   = Number(players?.[targetPid]?.point ?? 0);
+  const point      = Number(sendAmountValue);
+
+  const fromAfter = fromBefore - point;
+  const toAfter   = toBefore + point;
+
+  // transferRequests に記録
+  const reqId = genTransferRequestId();
+  const reqPath = `rooms/${roomId}/transferRequests/${reqId}`;
+
+  // multi-location update（transaction禁止）
+  const updates = {};
+  updates[`rooms/${roomId}/players/${myPid}/point`] = fromAfter;
+  updates[`rooms/${roomId}/players/${targetPid}/point`] = toAfter;
+
+  // paymentの場合：受け取り側 yakitoriFlg を false に更新（仕様）
+  updates[`rooms/${roomId}/players/${targetPid}/yakitoriFlg`] = false;
+
+  updates[reqPath] = {
+    fromPlayerId: myPid,
+    toPlayerId: targetPid,
+    point,
+    fromBefore,
+    fromAfter,
+    toBefore,
+    toAfter,
+    type: "payment",
+    status: "pending",
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    checkedAt: null,
+    checkedByPlayerId: null
+  };
+
+  await db.ref().update(updates);
+
+  cancelTransfer(); // UIリセット
+}
+
+
+// リーチ棒表示
+function renderRiichiSticks(count){
+  const wrap = document.getElementById("riichiSticks");
+  const num  = document.getElementById("riichiCount");
+  if (!wrap || !num) return;
+
+  const c = Number(count || 0);
+
+  wrap.innerHTML = "";
+
+  if (c <= 0){
+    num.textContent = "0";
+    return;
+  }
+
+  // 棒は常に1本だけ
+  const d = document.createElement("div");
+  d.className = "stick";
+  wrap.appendChild(d);
+
+  // ×N 表示
+  num.textContent = `×${c}`;
+}
+
+
+// ボトムシートを開く
+function openTransferSheet(){
+  transferOverlay.classList.remove("hidden");
+  transferSheet.classList.remove("hidden");
+  // アニメ用クラスは次フレームで付ける（効く）
+  requestAnimationFrame(() => transferSheet.classList.add("is-open"));
+}
+
+// ボトムシートを閉じる
+function closeTransferSheet(){
+  transferSheet.classList.remove("is-open");
+  transferOverlay.classList.add("hidden");
+  // transition後にhiddenへ（雑でもOKならsetTimeout）
+  setTimeout(() => {
+    transferSheet.classList.add("hidden");
+  }, 230);
+}
+
+// 観戦描画関数
+function renderSpectatorUI(players, gameConfig, entryPlayers) {
+  // 上部：東、反時計回り：南、西、北
+  // 画面の4枠（上/左/中央/下）へ割り当て：
+  // 上(nameN/pointN) = 東
+  // 左(nameW/pointW) = 南
+  // 中央(myName/myPoint) = 西
+  // 下(nameS/pointS) = 北
+
+  const dirToPid = {};
+  for (const [pid, p] of Object.entries(players || {})) {
+    if (p?.direction) dirToPid[p.direction] = pid;
+  }
+
+  const nameOf = (pid) => pid ? (entryPlayers?.[pid]?.name ?? "不明") : "-";
+  const pointOf = (pid) => pid ? String(Number(players?.[pid]?.point ?? 0)) : "-";
+
+  const pidE = dirToPid["東"] || null;
+  const pidS = dirToPid["南"] || null;
+  const pidW = dirToPid["西"] || null;
+  const pidN = dirToPid["北"] || null;
+
+  // 上：東
+  setText("nameN", nameOf(pidE));
+  setText("pointN", pointOf(pidE));
+  setText("diffN", "-");
+
+  // 左：南
+  setText("nameW", nameOf(pidS));
+  setText("pointW", pointOf(pidS));
+  setText("diffW", "-");
+
+  // 中央：西（自分枠を流用）
+  setText("myName", nameOf(pidW));
+  setText("myPoint", pointOf(pidW));
+
+  // 下：北
+  setText("nameS", nameOf(pidN));
+  setText("pointS", pointOf(pidN));
+  setText("diffS", "-");
+
+  // リーチ棒
+  setText("riichiCount", Number(gameConfig?.riichiStickCount ?? 0));
+
+  // ヤキトリ（空席は非表示）
+  const setYakitoriByPid = (imgId, pid) => {
+    const el = document.getElementById(imgId);
+    if (!el) return;
+
+    if (!pid) {
+      el.classList.add("is-hidden");
+      return;
+    }
+    el.classList.remove("is-hidden");
+    setYakitoriImg(imgId, players?.[pid]?.yakitoriFlg === true);
+  };
+
+  // 上=東 => yakitoriN
+  setYakitoriByPid("yakitoriN", pidE);
+  // 左=南 => yakitoriW
+  setYakitoriByPid("yakitoriW", pidS);
+  // 中央=西 => yakitoriME
+  setYakitoriByPid("yakitoriME", pidW);
+  // 下=北 => yakitoriS
+  setYakitoriByPid("yakitoriS", pidN);
+
+  // 観戦は席タップで支払などをさせない（毎回念押し）
+  const seatEls = [
+    document.querySelector(".gs-north"),
+    document.querySelector(".gs-west"),
+    document.querySelector(".gs-south")
+  ];
+  for (const el of seatEls) {
+    if (!el) continue;
+    el.onclick = null;
+    el.classList.remove("tapTarget");
+  }
+
+}
+
+let currentReceiveReqId = null;
+
+// 受取ポップアップ 開閉
+function openReceiveSheet(){
+  // ★閉じタイマーが残ってたらキャンセル
+  if (receiveCloseTimer) {
+    clearTimeout(receiveCloseTimer);
+    receiveCloseTimer = null;
+  }
+
+  receiveOverlay.classList.remove("hidden");
+  receiveSheet.classList.remove("hidden");
+
+  // アニメ開始
+  requestAnimationFrame(() => receiveSheet.classList.add("is-open"));
+}
+
+
+function closeReceiveSheet(){
+  receiveSheet.classList.remove("is-open");
+  receiveOverlay.classList.add("hidden");
+
+  // ★前のタイマーがあれば消す
+  if (receiveCloseTimer) {
+    clearTimeout(receiveCloseTimer);
+    receiveCloseTimer = null;
+  }
+
+  // ★閉じアニメ後にhidden
+  receiveCloseTimer = setTimeout(() => {
+    // いま開いてない時だけhidden（次を開いてたら隠さない）
+    if (!receiveSheet.classList.contains("is-open")) {
+      receiveSheet.classList.add("hidden");
+    }
+    receiveCloseTimer = null;
+  }, 230);
+
+  // 表示中終了
+  currentReceiveReqId = null;
+  receiveShowing = false;
+
+  // ★次の受取は「閉じアニメが終わってから」表示する
+  setTimeout(() => {
+    showNextReceiveIfNeeded();
+  }, 240);
+}
+
+
+
+async function loadHistoryOnce(){
+  if (!currentRoomId) return;
+
+  const myPid = currentGameInfo.playerId;
+  if (!myPid) return; // 観戦は履歴出さないならここでreturn
+
+  const [tSnap, eSnap] = await Promise.all([
+    db.ref(`rooms/${currentRoomId}/transferRequests`).once("value"),
+    db.ref(`systemConfig/entryPlayers`).once("value")
+  ]);
+
+  const all = tSnap.val() || {};
+  const ep  = eSnap.val() || {};
+
+  historyCache = Object.entries(all)
+    .map(([id, v]) => ({ _id: id, ...(v || {}) }))
+    .filter(h => h && (h.fromPlayerId === myPid || h.toPlayerId === myPid))
+    .sort((a,b) => Number(a.createdAt||0) - Number(b.createdAt||0));
+
+  renderHistoryList(ep);
+}
+
+// ===============================
+// 逆転条件（Bottom Sheet）
+// ===============================
+let gyakuLatestPlayers = null;
+let gyakuLatestEntryPlayers = null;
+let gyakuLatestgameConfig = null;
+
+// 023: 自分が 親/子
+let gyakuSelfRole = null; // "parent" | "child"
+
+// 役表示（表の順）
+const GY_LABELS = ["1役","2役","3役","満貫","跳満","倍満","3倍満","役満","W役満"];
+
+// 直撃点数表示変換表（画像に合わせる）
+const RON_TABLE_PARENT = [
+  { min:0,     max:3000,   point:1500,  label:GY_LABELS[0] }, // 1役
+  { min:3000,  max:6000,   point:3000,  label:GY_LABELS[1] }, // 2役
+  { min:6000,  max:12000,  point:6000,  label:GY_LABELS[2] }, // 3役
+  { min:12000, max:24000,  point:12000, label:GY_LABELS[3] }, // 満貫
+  { min:24000, max:36000,  point:18000, label:GY_LABELS[4] }, // 跳満
+  { min:36000, max:48000,  point:24000, label:GY_LABELS[5] }, // 倍満
+  { min:48000, max:72000,  point:36000, label:GY_LABELS[6] }, // 3倍満
+  { min:72000, max:96000,  point:48000, label:GY_LABELS[7] }, // 役満
+  { min:96000, max:192000, point:96000, label:GY_LABELS[8] }, // 役満
+];
+
+const RON_TABLE_CHILD = [
+  { min:0,     max:2000,   point:1000,  label:GY_LABELS[0] },
+  { min:2000,  max:4000,   point:2000,  label:GY_LABELS[1] },
+  { min:4000,  max:8000,   point:4000,  label:GY_LABELS[2] },
+  { min:8000,  max:16000,  point:8000,  label:GY_LABELS[3] },
+  { min:16000, max:24000,  point:12000, label:GY_LABELS[4] },
+  { min:24000, max:32000,  point:16000, label:GY_LABELS[5] },
+  { min:32000, max:48000,  point:24000, label:GY_LABELS[6] },
+  { min:48000, max:64000,  point:32000, label:GY_LABELS[7] },
+  { min:64000, max:128000, point:64000, label:GY_LABELS[8] },
+];
+
+// 直撃点表示変換表（画像の表）
+// selfRole: "parent" or "child"
+const GY_RON_TABLE = {
+  parent: [
+    { min: 0,     max: 3000,   point: 1500 },
+    { min: 3000,  max: 6000,   point: 3000 },
+    { min: 6000,  max: 12000,  point: 6000 },
+    { min: 12000, max: 24000,  point: 12000 },
+    { min: 24000, max: 36000,  point: 18000 },
+    { min: 36000, max: 48000,  point: 24000 },
+    { min: 48000, max: 72000,  point: 36000 },
+    { min: 72000, max: 96000,  point: 48000 },
+    { min: 96000, max: 192000, point: 96000 },
+  ],
+  child: [
+    { min: 0,     max: 2000,   point: 1000 },
+    { min: 2000,  max: 4000,   point: 2000 },
+    { min: 4000,  max: 8000,   point: 4000 },
+    { min: 8000,  max: 16000,  point: 8000 },
+    { min: 16000, max: 24000,  point: 12000 },
+    { min: 24000, max: 32000,  point: 16000 },
+    { min: 32000, max: 48000,  point: 24000 },
+    { min: 48000, max: 64000,  point: 32000 },
+    { min: 64000, max: 128000, point: 64000 },
+  ],
+};
+
+
+// ツモ：必要な「自分の増分(selfGain)」と「トップの減分(topLoss)」を分ける
+// row = {min,max,selfGain,topLoss,label}
+const TSUMO_TABLES = {
+  "4": {
+    // 自分=親 / 相手(トップ)=子
+    parent_vs_child: [
+      { min:0,     max:2000,   selfGain:1500, topLoss:500,  label:GY_LABELS[0] },
+      { min:2000,  max:4000,   selfGain:3000, topLoss:1000, label:GY_LABELS[1] },
+      { min:4000,  max:8000,   selfGain:6000, topLoss:2000, label:GY_LABELS[2] },
+      { min:8000,  max:16000,  selfGain:12000,topLoss:4000, label:GY_LABELS[3] },
+      { min:16000, max:24000,  selfGain:18000,topLoss:6000, label:GY_LABELS[4] },
+      { min:24000, max:32000,  selfGain:24000,topLoss:8000, label:GY_LABELS[5] },
+      { min:32000, max:48000,  selfGain:36000,topLoss:12000,label:GY_LABELS[6] },
+      { min:48000, max:64000,  selfGain:48000,topLoss:16000,label:GY_LABELS[7] },
+      { min:64000, max:128000, selfGain:96000,topLoss:32000,label:GY_LABELS[8] },
+    ],
+    // 自分=子 / 相手(トップ)=親
+    child_vs_parent: [
+      { min:0,     max:1600,   selfGain:1100, topLoss:500,  label:GY_LABELS[0] },
+      { min:1600,  max:3000,   selfGain:2000, topLoss:1000, label:GY_LABELS[1] },
+      { min:3000,  max:6000,   selfGain:4000, topLoss:2000, label:GY_LABELS[2] },
+      { min:6000,  max:12000,  selfGain:8000, topLoss:4000, label:GY_LABELS[3] },
+      { min:12000, max:18000,  selfGain:12000,topLoss:6000, label:GY_LABELS[4] },
+      { min:18000, max:24000,  selfGain:16000,topLoss:8000, label:GY_LABELS[5] },
+      { min:24000, max:36000,  selfGain:24000,topLoss:12000,label:GY_LABELS[6] },
+      { min:36000, max:54000,  selfGain:32000,topLoss:16000,label:GY_LABELS[7] },
+      { min:54000, max:96000,  selfGain:64000,topLoss:32000,label:GY_LABELS[8] },
+    ],
+    // 自分=子 / 相手(トップ)=子
+    child_vs_child: [
+      { min:0,     max:1400,   selfGain:1000, topLoss:300,  label:GY_LABELS[0] },
+      { min:1400,  max:2500,   selfGain:2000, topLoss:500,  label:GY_LABELS[1] },
+      { min:2500,  max:5000,   selfGain:4000, topLoss:1000, label:GY_LABELS[2] },
+      { min:5000,  max:10000,  selfGain:8000, topLoss:2000, label:GY_LABELS[3] },
+      { min:10000, max:15000,  selfGain:12000,topLoss:3000, label:GY_LABELS[4] },
+      { min:15000, max:20000,  selfGain:16000,topLoss:4000, label:GY_LABELS[5] },
+      { min:20000, max:30000,  selfGain:24000,topLoss:6000, label:GY_LABELS[6] },
+      { min:30000, max:45000,  selfGain:32000,topLoss:9000, label:GY_LABELS[7] },
+      { min:45000, max:80000,  selfGain:64000,topLoss:16000,label:GY_LABELS[8] },
+    ],
+  },
+
+  "3": {
+    // 自分=親 / 相手(トップ)=子
+    parent_vs_child: [
+      { min:0,     max:2400,   selfGain:1600, topLoss:800,  label:GY_LABELS[0] },
+      { min:2400,  max:4500,   selfGain:3000, topLoss:1500, label:GY_LABELS[1] },
+      { min:4500,  max:9000,   selfGain:6000, topLoss:3000, label:GY_LABELS[2] },
+      { min:9000,  max:18000,  selfGain:12000,topLoss:6000, label:GY_LABELS[3] },
+      { min:18000, max:27000,  selfGain:18000,topLoss:9000, label:GY_LABELS[4] },
+      { min:27000, max:36000,  selfGain:24000,topLoss:12000,label:GY_LABELS[5] },
+      { min:36000, max:54000,  selfGain:36000,topLoss:18000,label:GY_LABELS[6] },
+      { min:54000, max:72000,  selfGain:48000,topLoss:24000,label:GY_LABELS[7] },
+      { min:72000, max:144000, selfGain:96000,topLoss:48000,label:GY_LABELS[8] },
+    ],
+    // 自分=子 / 相手(トップ)=親
+    child_vs_parent: [
+      { min:0,     max:1900,   selfGain:1100, topLoss:700,  label:GY_LABELS[0] },
+      { min:1900,  max:3400,   selfGain:2000, topLoss:1300, label:GY_LABELS[1] },
+      { min:3400,  max:6500,   selfGain:4000, topLoss:2500, label:GY_LABELS[2] },
+      { min:6500,  max:13000,  selfGain:8000, topLoss:5000, label:GY_LABELS[3] },
+      { min:13000, max:19500,  selfGain:12000,topLoss:7500, label:GY_LABELS[4] },
+      { min:19500, max:26000,  selfGain:16000,topLoss:10000,label:GY_LABELS[5] },
+      { min:26000, max:39000,  selfGain:24000,topLoss:15000,label:GY_LABELS[6] },
+      { min:39000, max:52000,  selfGain:32000,topLoss:20000,label:GY_LABELS[7] },
+      { min:52000, max:104000, selfGain:64000,topLoss:40000,label:GY_LABELS[8] },
+    ],
+    // 自分=子 / 相手(トップ)=子
+    child_vs_child: [
+      { min:0,     max:1700,   selfGain:1100, topLoss:500,  label:GY_LABELS[0] },
+      { min:1700,  max:2900,   selfGain:2000, topLoss:800,  label:GY_LABELS[1] },
+      { min:2900,  max:5500,   selfGain:4000, topLoss:1500, label:GY_LABELS[2] },
+      { min:5500,  max:11000,  selfGain:8000, topLoss:3000, label:GY_LABELS[3] },
+      { min:11000, max:16500,  selfGain:12000,topLoss:4500, label:GY_LABELS[4] },
+      { min:16500, max:22000,  selfGain:16000,topLoss:6000, label:GY_LABELS[5] },
+      { min:22000, max:33000,  selfGain:24000,topLoss:9000, label:GY_LABELS[6] },
+      { min:33000, max:44000,  selfGain:32000,topLoss:12000,label:GY_LABELS[7] },
+      { min:44000, max:88000,  selfGain:64000,topLoss:24000,label:GY_LABELS[8] },
+    ],
+  },
+
+  // 3r4 は表自体は 3 と同じ計算でまずOK（抜け番対応を入れるなら別途キー追加）
+  "3r4": null,
+};
+
+// 3r4（3麻4人回し）専用：抜け番（相手支払い0）のツモ変換表
+// 023の選択が「親」のときの抜け番列
+const TSUMO_NUKE_023_OYA = [
+  { min: 0,     max: 1600,  me: 1600  },
+  { min: 1600,  max: 3000,  me: 3000  },
+  { min: 3000,  max: 6000,  me: 6000  },
+  { min: 6000,  max: 12000, me: 12000 },
+  { min: 12000, max: 18000, me: 18000 },
+  { min: 18000, max: 24000, me: 24000 },
+  { min: 24000, max: 36000, me: 36000 },
+  { min: 36000, max: 48000, me: 48000 },
+  { min: 48000, max: 96000, me: 96000 },
+];
+
+// 023の選択が「子」のときの抜け番列
+const TSUMO_NUKE_023_KO = [
+  { min: 0,     max: 1100,  me: 1100  },
+  { min: 1100,  max: 2000,  me: 2000  },
+  { min: 2000,  max: 4000,  me: 4000  },
+  { min: 4000,  max: 8000,  me: 8000  },
+  { min: 8000,  max: 12000, me: 12000 },
+  { min: 12000, max: 16000, me: 16000 },
+  { min: 16000, max: 24000, me: 24000 },
+  { min: 24000, max: 32000, me: 32000 },
+  { min: 32000, max: 64000, me: 64000 },
+];
+
+// label 付与（★必ず両方の const の後）
+[TSUMO_NUKE_023_OYA, TSUMO_NUKE_023_KO].forEach(tbl => {
+  tbl.forEach((r, i) => { r.label = GY_LABELS[i]; });
+});
+
+function formatNeed(label, point){
+  const p = Number(point || 0);
+  if (!label) return String(p);
+  return `${label}（${p}）`;
+}
+
+function lookupRonPoint(diffAbs, selfRole) {
+  const rows = GY_RON_TABLE[selfRole] || GY_RON_TABLE.child;
+  for (const r of rows) {
+    // 表の条件：min <= diff < max
+    if (diffAbs >= r.min && diffAbs < r.max) return r.point;
+  }
+  // 範囲外は最後のpoint扱い（保険）
+  return rows[rows.length - 1].point;
+}
+
+function lookupRonRow(diffAbs, selfRole) {
+  const rows = (selfRole === "parent") ? RON_TABLE_PARENT : RON_TABLE_CHILD;
+  for (const r of rows) {
+    if (diffAbs >= r.min && diffAbs < r.max) return r; // {point,label}
+  }
+  return rows[rows.length - 1];
+}
+
+function setText(id, v){
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(v);
+}
+
+function showEl(id, show){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("hidden", !show);
+}
+
+// 抜け番（3麻4人回し）の「直撃（ロン）」表示
+// - トップは支払い0（±0）
+// - トップ以外の2人がそれぞれ payEach を支払う
+// - 自分の増分は (payEach*2 + リーチ棒)
+function renderRonNuke_3r4({
+  rule,
+  selfRole,      // "parent" or "child"
+  mePid,
+  topPid,
+  diffAbs,       // 表示用に0判定などに使う（元の点差）
+  diffForMap,    // ★表判定用（リーチ棒控除後の差分）
+  riichiPoint,   // ★自分加算用（場のリーチ棒）
+  players        // { pid: {name, point}, ... }
+}) {
+  const enable = (rule === "3r4");
+  showEl("gyRonNuke", enable);
+  if (!enable) return;
+
+  // トップ以外＆自分以外の2人（= 支払い担当2人）
+  const otherPids = Object.keys(players || {})
+    .filter(pid => pid !== mePid && pid !== topPid)
+    .slice(0, 2);
+
+  // 万一2人取れないなら非表示
+  if (otherPids.length < 2) {
+    showEl("gyRonNuke", false);
+    return;
+  }
+
+  const me  = players[mePid];
+  const top = players[topPid];
+  const o1  = players[otherPids[0]];
+  const o2  = players[otherPids[1]];
+
+  // -----------------------------
+  // ① 表（役/点）の判定は diffForMap を使う
+  //   ※通常ロンと同じ考え方（リーチ棒分は差分から控除して表を引く）
+  // -----------------------------
+  const ronTable = (selfRole === "parent") ? RON_TABLE_PARENT : RON_TABLE_CHILD;
+  const baseRow  = findNeed(diffForMap, ronTable);      // {min,max,point,label}
+  const payEach  = Number(baseRow.point || 0);          // 2人がそれぞれ支払う額
+
+  // ★和了者の増分：2人分 + リーチ棒
+  const meGain = payEach + Number(riichiPoint || 0);
+
+  // -----------------------------
+  // ② before/after 計算
+  // -----------------------------
+  const meBefore  = Number(me?.point ?? 0);
+  const topBefore = Number(top?.point ?? 0);
+  const o1Before  = Number(o1?.point ?? 0);
+  const o2Before  = Number(o2?.point ?? 0);
+
+  const meAfter  = meBefore + meGain;
+  const topAfter = topBefore;          // トップは±0
+  const o1After  = o1Before - payEach; // 支払いは各payEach
+  const o2After  = o2Before - payEach;
+
+  // -----------------------------
+  // ③ 表示
+  //   diffAbs が0（=自分がトップ等）なら "-" を出す既存仕様を維持
+  // -----------------------------
+  setText("gyRonNeed_nuke", diffAbs ? formatNeed(baseRow.label, meGain) : "-");
+
+  // 自分
+  setText("gyRonMeBefore_nuke", diffAbs ? String(meBefore) : "-");
+  setText("gyRonMeAfter_nuke",  diffAbs ? String(meAfter)  : "-");
+  setText("gyRonMeDelta_nuke",  diffAbs ? `（+${meGain}）` : "-");
+
+  // TOP
+  setText("gyRonTopName",        diffAbs ? (top?.name ?? "TOP") : "-"); // ★??の優先順位修正
+  setText("gyRonTopBefore_nuke", diffAbs ? String(topBefore) : "-");
+  setText("gyRonTopAfter_nuke",  diffAbs ? String(topAfter)  : "-");
+  setText("gyRonTopDelta_nuke",  diffAbs ? "（±0）" : "-");
+
+  // その他①②
+  setText("gyRonOther1Name", o1?.name ?? "その他①");
+  setText("gyRonOther2Name", o2?.name ?? "その他②");
+
+  setText("gyRonOther1Before", diffAbs ? String(o1Before) : "-");
+  setText("gyRonOther1After",  diffAbs ? String(o1After)  : "-");
+  setText("gyRonOther1Delta",  diffAbs ? `（-${payEach}）` : "-");
+
+  setText("gyRonOther2Before", diffAbs ? String(o2Before) : "-");
+  setText("gyRonOther2After",  diffAbs ? String(o2After)  : "-");
+  setText("gyRonOther2Delta",  diffAbs ? `（-${payEach}）` : "-");
+}
+
+
+
+
+
+function lookupNuke(diff, is023OyaSelected){
+  const table = is023OyaSelected ? TSUMO_NUKE_023_OYA : TSUMO_NUKE_023_KO;
+  const row = table.find(r => diff >= r.min && diff < r.max) || table[table.length - 1];
+  return { label: row.label, me: row.me, opp: 0 };
+}
+
+
+function isParentByDirection(dir){
+  return dir === "東";
+}
+
+function findNeedRow(diff, table){
+  const d = Math.max(0, Number(diff || 0));
+  for (const r of table){
+    if (d >= r.min && d < r.max) return r;
+  }
+  return table[table.length - 1];
+}
+
+function findNeed(diff, table){
+  const d = Math.max(0, Number(diff || 0));
+  for (const r of table){
+    if (d >= r.min && d < r.max) return r;
+  }
+  // 上限超えは最後の行
+  return table[table.length - 1];
+}
+
+function getMyRoleDefault(){
+  // 既定：自分の direction が 東 なら親、それ以外は子
+  return (currentGameInfo?.direction === "東") ? "parent" : "child";
+}
+
+function setGyakuRadio(role){
+  const rs = document.querySelectorAll('input[name="gySelfRole"]');
+  rs.forEach(r => r.checked = (r.value === role));
+}
+
+function hookGyakuRadioOnce(){
+  const rs = document.querySelectorAll('input[name="gySelfRole"]');
+  rs.forEach(r => {
+    // 何回openしても二重登録しにくいように一度消す（簡易）
+    r.onchange = null;
+    r.onchange = () => {
+      gyakuSelfRole = r.value;
+      if (gyakuLatestPlayers && gyakuLatestEntryPlayers && gyakuLatestgameConfig) {
+        renderGyakuSheet(gyakuLatestPlayers, gyakuLatestEntryPlayers, gyakuLatestgameConfig);
+      }
+    };
+  });
+}
+
+// 逆転
+function openGyakuSheet(){
+  if (isSpectatorMode) return; // 観戦は不可にするなら（必要なら外してOK）
+
+  gyakuOverlay.classList.remove("hidden");
+  gyakuSheet.classList.remove("hidden");
+  requestAnimationFrame(() => gyakuSheet.classList.add("is-open"));
+
+  // 初回だけデフォルトセット
+  if (!gyakuSelfRole) gyakuSelfRole = getMyRoleDefault();
+  setGyakuRadio(gyakuSelfRole);
+  hookGyakuRadioOnce();
+
+  subscribeGyakuSheet();
+}
+
+// 逆転
+function closeGyakuSheet(){
+  gyakuSheet.classList.remove("is-open");
+  gyakuOverlay.classList.add("hidden");
+  setTimeout(() => gyakuSheet.classList.add("hidden"), 230);
+
+  if (gyakuUnsub) { gyakuUnsub(); gyakuUnsub = null; }
+}
+
+// 逆転
+function subscribeGyakuSheet(){
+  if (!currentRoomId) return;
+
+  // 既存解除
+  if (gyakuUnsub) gyakuUnsub();
+
+  const playersRef = db.ref(`rooms/${currentRoomId}/players`);
+  const entryRef   = db.ref(`systemConfig/entryPlayers`);
+  const gameConfigRef   = db.ref(`rooms/${currentRoomId}/gameConfig`);
+
+  const handler = async () => {
+    const [pSnap, eSnap, gSnap] = await Promise.all([
+      playersRef.once("value"),
+      entryRef.once("value"),
+      gameConfigRef.once("value"),
+    ]);
+    gyakuLatestPlayers = pSnap.val() || {};
+    gyakuLatestEntryPlayers = eSnap.val() || {};
+    gyakuLatestgameConfig = gSnap.val() || {};
+    renderGyakuSheet(gyakuLatestPlayers, gyakuLatestEntryPlayers, gyakuLatestgameConfig);
+  };
+
+  playersRef.on("value", handler);
+  gyakuUnsub = () => playersRef.off("value", handler);
+
+  handler();
+  document.getElementById("gyakuBody")?.scrollTo({ top: 0 });
+}
+
+// 逆転
+function renderGyakuSheet(players, entryPlayers, gyakuLatestgameConfig){
+  const myPid = currentGameInfo?.playerId;
+  if (!myPid || !players?.[myPid]) return;
+
+  const myPoint = Number(players[myPid]?.point ?? 0);
+
+  // トップ（参加者の最大point）
+  let topPid = myPid;
+  let topPoint = myPoint;
+  for (const [pid, p] of Object.entries(players || {})){
+    if (!p?.direction) continue;
+    const pt = Number(p.point ?? 0);
+    if (pt > topPoint){
+      topPoint = pt;
+      topPid = pid;
+    }
+  }
+
+  // 差分（トップ - 自分）
+  const diffRaw = Number(topPoint - myPoint);
+  const diff = Math.max(0, diffRaw);
+
+  // ★リーチ棒（場）を考慮
+  const riichi_stick_count = Number(gyakuLatestgameConfig?.riichiStickCount ?? 0);
+  const riichi_point = riichi_stick_count * 1000;
+
+  // ★表のマッピングに使う差分：差分 - リーチ棒（下限0）
+  const diffForMap = Math.max(0, diff - riichi_point);
+
+  // 023: 自分の立場
+  const selfRole = document.querySelector('input[name="gySelfRole"]:checked')?.value || "child";
+  gyakuSelfRole = selfRole;
+  const isSelfParent = (selfRole === "parent");
+
+  // 表示（トップ/自分/点差/リーチ棒）
+  setText("gyName", `${String(entryPlayers[topPid].name)}（${topPoint}）`);
+  setText("gyMyName", `${String(entryPlayers[myPid].name)}（${myPoint}）`);
+  setText("gyDiff", String(diff * -1)); // 表示は従来通り（必要ならここも diffForMap に変えられます）
+  setText("gyRiichiStickCount", `${String(riichi_stick_count)}本`);
+  setText("gyRiichiPoint",  diff ? `（${riichi_point}）` : "-");
+
+  // ---------- 直撃（ロン） ----------
+  const ronRow = (topPid === myPid)
+    ? { point: 0, label: "トップ" }
+    // ★マッピングは diffForMap を使う
+    : findNeed(diffForMap, isSelfParent ? RON_TABLE_PARENT : RON_TABLE_CHILD);
+
+  const baseRonP = Number(ronRow.point ?? 0);          // 相手から取るロン点（表の点）
+  const meRonGain = baseRonP + riichi_point;           // ★自分の増分はリーチ棒分を足す
+
+  // 直撃表示
+  const ronP = Number(ronRow.point ?? 0);
+  setText("gyRonNeed", diff ? formatNeed(ronRow?.label, meRonGain) : "-");
+
+  setText("gyRonMeBefore", diff ? String(myPoint) : "-");
+  setText("gyRonMeAfter",  diff ? String(myPoint + meRonGain) : "-");
+  setText("gyRonMeDelta",  diff ? `（+${meRonGain}）` : "-");
+
+  setText("gyRonTopBefore", diff ? String(topPoint) : "-");
+  setText("gyRonTopAfter",  diff ? String(topPoint - baseRonP) : "-"); // ★トップ減分は据え置き
+  setText("gyRonTopDelta",  diff ? `（-${baseRonP}）` : "-");
+
+  // ---------- ★3麻4人回し：抜け番（ロン） ----------
+  const playersForRonNuke = {};
+  for (const [pid, p] of Object.entries(players || {})) {
+    if (!p?.direction) continue;
+    playersForRonNuke[pid] = {
+      name: entryPlayers?.[pid]?.name ?? pid,
+      point: Number(p.point ?? 0),
+    };
+  }
+
+  renderRonNuke_3r4({
+    rule: currentRule,
+    selfRole,
+    mePid: myPid,
+    topPid,
+    diffAbs: Math.abs(topPoint - myPoint),   // 元の点差（表示用のままでOK）
+    diffForMap,                              // ★追加：表判定用
+    riichiPoint: riichi_point,               // ★追加：自分加算用
+    players: playersForRonNuke
+  });
+
+  // ---------- ツモ ----------
+  if (topPid === myPid) {
+    renderGyakuTsumoBlocks(selfRole,
+      { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" },
+      { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" }
+    );
+    renderGyakuNuke(false, diff, selfRole, myPoint, topPoint, riichi_point, diffForMap);
+    return;
+  }
+
+  const ruleKey = (currentRule === "3r4") ? "3" : String(currentRule || "3");
+  const tables = TSUMO_TABLES[ruleKey];
+  if (!tables) {
+    renderGyakuTsumoBlocks(selfRole,
+      { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" },
+      { need:"-", meBefore:"-", meAfter:"-", meDelta:"（+0）", topBefore:"-", topAfter:"-", topDelta:"（-0）" }
+    );
+    renderGyakuNuke(false, diff, selfRole, myPoint, topPoint, riichi_point, diffForMap);
+    return;
+  }
+
+  let patVsParent = null;
+  let patVsChild  = null;
+
+  if (selfRole === "parent") {
+    // ★diffForMap で判定
+    const row = findNeedRow(diffForMap, tables.parent_vs_child);
+    const meGain = Number(row.selfGain) + riichi_point;
+
+    patVsChild = {
+      need: `${row.label}（+${meGain} / トップ-${row.topLoss}）`,
+      meBefore: String(myPoint),
+      meAfter:  String(myPoint + meGain),
+      meDelta:  `（+${meGain}）`,
+      topBefore:String(topPoint),
+      topAfter: String(topPoint - row.topLoss),
+      topDelta: `（-${row.topLoss}）`,
+    };
+  } else {
+    const rowParent = findNeedRow(diffForMap, tables.child_vs_parent);
+    const rowChild  = findNeedRow(diffForMap, tables.child_vs_child);
+
+    const meGainParent = Number(rowParent.selfGain) + riichi_point;
+    const meGainChild  = Number(rowChild.selfGain)  + riichi_point;
+
+    patVsParent = {
+      need: `${rowParent.label}（+${meGainParent} / トップ-${rowParent.topLoss}）`,
+      meBefore: String(myPoint),
+      meAfter:  String(myPoint + meGainParent),
+      meDelta:  `（+${meGainParent}）`,
+      topBefore:String(topPoint),
+      topAfter: String(topPoint - rowParent.topLoss),
+      topDelta: `（-${rowParent.topLoss}）`,
+    };
+    patVsChild = {
+      need: `${rowChild.label}（+${meGainChild} / トップ-${rowChild.topLoss}）`,
+      meBefore: String(myPoint),
+      meAfter:  String(myPoint + meGainChild),
+      meDelta:  `（+${meGainChild}）`,
+      topBefore:String(topPoint),
+      topAfter: String(topPoint - rowChild.topLoss),
+      topDelta: `（-${rowChild.topLoss}）`,
+    };
+  }
+
+  renderGyakuTsumoBlocks(selfRole, patVsParent, patVsChild);
+
+  // ★3r4 抜け番：diffForMap & riichi_point を渡す
+  renderGyakuNuke(currentRule === "3r4", diff, selfRole, myPoint, topPoint, riichi_point, diffForMap);
+}
+
+
+
+
+// 逆転
+function renderGyakuTsumoBlocks(selfRole, patVsParent, patVsChild) {
+  const boxParent = document.getElementById("gyTsumoVsParent");
+  const boxChild  = document.getElementById("gyTsumoVsChild");
+
+  if (selfRole === "parent") {
+    boxParent?.classList.add("hidden");
+    boxChild?.classList.remove("hidden");
+
+    setText("gyTsumoNeed_vsChild", patVsChild?.need ?? "-");
+    setText("gyTsumoMeBefore_vsChild", patVsChild?.meBefore ?? "-");
+    setText("gyTsumoMeAfter_vsChild",  patVsChild?.meAfter ?? "-");
+    setText("gyTsumoMeDelta_vsChild",  patVsChild?.meDelta ?? "（+0）");
+
+    setText("gyTsumoTopBefore_vsChild",patVsChild?.topBefore ?? "-");
+    setText("gyTsumoTopAfter_vsChild", patVsChild?.topAfter ?? "-");
+    setText("gyTsumoTopDelta_vsChild", patVsChild?.topDelta ?? "（-0）");
+    return;
+  }
+
+  // 自分=子：親/子の2パターン表示
+  boxParent?.classList.remove("hidden");
+  boxChild?.classList.remove("hidden");
+
+  // vs 親
+  setText("gyTsumoNeed_vsParent", patVsParent?.need ?? "-");
+  setText("gyTsumoMeBefore_vsParent", patVsParent?.meBefore ?? "-");
+  setText("gyTsumoMeAfter_vsParent",  patVsParent?.meAfter ?? "-");
+  setText("gyTsumoMeDelta_vsParent",  patVsParent?.meDelta ?? "（+0）");
+
+  setText("gyTsumoTopBefore_vsParent",patVsParent?.topBefore ?? "-");
+  setText("gyTsumoTopAfter_vsParent", patVsParent?.topAfter ?? "-");
+  setText("gyTsumoTopDelta_vsParent", patVsParent?.topDelta ?? "（-0）");
+
+  // vs 子
+  setText("gyTsumoNeed_vsChild", patVsChild?.need ?? "-");
+  setText("gyTsumoMeBefore_vsChild", patVsChild?.meBefore ?? "-");
+  setText("gyTsumoMeAfter_vsChild",  patVsChild?.meAfter ?? "-");
+  setText("gyTsumoMeDelta_vsChild",  patVsChild?.meDelta ?? "（+0）");
+
+  setText("gyTsumoTopBefore_vsChild",patVsChild?.topBefore ?? "-");
+  setText("gyTsumoTopAfter_vsChild", patVsChild?.topAfter ?? "-");
+  setText("gyTsumoTopDelta_vsChild", patVsChild?.topDelta ?? "（-0）");
+}
+
+function renderGyakuNuke(enabled, diff, selfRole, myPoint, topPoint, riichiPoint, diffForMap){
+  const box = document.getElementById("gyTsumoNuke");
+  if (!box) return;
+
+  if (!enabled) {
+    box.classList.add("hidden");
+    return;
+  }
+
+  box.classList.remove("hidden");
+
+  const is023OyaSelected = (selfRole === "parent");
+  const nuke = lookupNuke(diffForMap, is023OyaSelected); // ★diffForMapで判定
+
+  const meGain = Number(nuke.me) + Number(riichiPoint || 0);
+
+  setText("gyTsumoNeed_nuke", `${nuke.label}（+${meGain} / トップ-0）`);
+
+  setText("gyTsumoMeBefore_nuke", String(myPoint));
+  setText("gyTsumoMeAfter_nuke",  String(myPoint + meGain));
+  setText("gyTsumoMeDelta_nuke",  `（+${meGain}）`);
+
+  setText("gyTsumoTopBefore_nuke", String(topPoint));
+  setText("gyTsumoTopAfter_nuke",  String(topPoint));
+  setText("gyTsumoTopDelta_nuke",  `（-0）`);
+}
+
+
+// 履歴シート 表示
+async function openHistorySheet(){
+  historyOverlay.classList.remove("hidden");
+  historySheet.classList.remove("hidden");
+  requestAnimationFrame(() => historySheet.classList.add("is-open"));
+
+  // ★追加：まず全件表示 → その後リアルタイム更新
+  historyCache = [];
+  await loadHistoryOnce();
+  subscribeHistory();
+}
+
+
+// 履歴シート 非表示
+function closeHistorySheet(){
+  historySheet.classList.remove("is-open");
+  historyOverlay.classList.add("hidden");
+  setTimeout(() => historySheet.classList.add("hidden"), 230);
+}
+
+// ===============================
+// 対局終了画面用：履歴（全件 / checkedAt 昇順）
+// ===============================
+async function loadHistoryAllOnceSortedByCheckedAtAsc(){
+  if (!currentRoomId) return;
+
+  const [tSnap, eSnap] = await Promise.all([
+    db.ref(`rooms/${currentRoomId}/transferRequests`).once("value"),
+    db.ref(`systemConfig/entryPlayers`).once("value")
+  ]);
+
+  const all = tSnap.val() || {};
+  const ep  = eSnap.val() || {};
+
+  historyCache = Object.entries(all)
+    .map(([id, v]) => ({ _id: id, ...(v || {}) }))
+    // checkedAt 昇順（null は最後に回す）
+    .sort((a,b) => {
+      const aa = (a.checkedAt === null || a.checkedAt === undefined) ? Infinity : Number(a.checkedAt);
+      const bb = (b.checkedAt === null || b.checkedAt === undefined) ? Infinity : Number(b.checkedAt);
+      if (aa !== bb) return aa - bb;
+
+      // 同じ checkedAt の場合は createdAt で安定化（任意）
+      const ac = Number(a.createdAt || 0);
+      const bc = Number(b.createdAt || 0);
+      return ac - bc;
+    });
+
+  renderHistoryList(ep);
+}
+
+async function openEndHistorySheet(){
+  historyOverlay.classList.remove("hidden");
+  historySheet.classList.remove("hidden");
+  requestAnimationFrame(() => historySheet.classList.add("is-open"));
+
+  // 対局終了画面は「全履歴」を checkedAt 昇順で表示
+  historyCache = [];
+  await loadHistoryAllOnceSortedByCheckedAtAsc();
+
+  // 対局終了後に履歴が増えるケースも拾いたいなら購読も可能（任意）
+  // subscribeHistoryAllByCheckedAtAsc();
+}
+
+// 任意：リアルタイムで追加分も反映したい場合
+function subscribeHistoryAllByCheckedAtAsc(){
+  if (!currentRoomId) return;
+  if (historyUnsub) historyUnsub();
+
+  const ref = db.ref(`rooms/${currentRoomId}/transferRequests`);
+
+  const handler = async (snap) => {
+    const obj = snap.val();
+    if (!obj) return;
+
+    const id = snap.key;
+    if (historyCache.some(x => x._id === id)) return;
+
+    historyCache.push({ _id: id, ...obj });
+    historyCache.sort((a,b) => {
+      const aa = (a.checkedAt === null || a.checkedAt === undefined) ? Infinity : Number(a.checkedAt);
+      const bb = (b.checkedAt === null || b.checkedAt === undefined) ? Infinity : Number(b.checkedAt);
+      if (aa !== bb) return aa - bb;
+      const ac = Number(a.createdAt || 0);
+      const bc = Number(b.createdAt || 0);
+      return ac - bc;
+    });
+
+    const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+    const ep = eSnap.val() || {};
+    renderHistoryList(ep);
+  };
+
+  ref.on("child_added", handler);
+  historyUnsub = () => ref.off("child_added", handler);
+}
+
+
+// ===== 受取ポップアップのキュー制御 =====
+let receiveQueue = [];          // [{ id, req }]
+let receiveShowing = false;     // 表示中フラグ
+let receiveQueuedIds = new Set(); // 重複防止
+let receiveCloseTimer = null; 
+
+window.addEventListener("unhandledrejection", () => {
+  receiveOverlay.classList.add("hidden");
+  receiveSheet.classList.add("hidden");
+  receiveShowing = false;
+});
+
+// 履歴購読関数
+function subscribeTransferRequests(){
+  if (!currentRoomId) return;
+  if (transferUnsub) transferUnsub();
+
+  const roomId = currentRoomId;
+  const myPid = currentGameInfo.playerId;
+  if (!myPid) return;
+
+  const ref = db.ref(`rooms/${roomId}/transferRequests`);
+
+  // ★ 初期化（入室のたびにクリアしたいなら）
+  if (receiveCloseTimer) {
+    clearTimeout(receiveCloseTimer);
+    receiveCloseTimer = null;
+  }
+  receiveQueue = [];
+  receiveQueuedIds = new Set();
+  receiveShowing = false;
+  currentReceiveReqId = null;
+
+  const handler = (snap) => {
+    const req = snap.val();
+    if (!req) return;
+
+    // payment だけ受取側にポップアップ（pendingのみ）
+    if (req.type === "payment" && req.status === "pending" && req.toPlayerId === myPid) {
+      const id = snap.key;
+      if (!id) return;
+
+      // 重複防止
+      if (receiveQueuedIds.has(id)) return;
+      receiveQueuedIds.add(id);
+
+      // キュー投入（順序は showNextReceiveIfNeeded 内で古い順に揃える）
+      receiveQueue.push({ id, req });
+
+      // 表示中でなければ次を表示
+      showNextReceiveIfNeeded();
+    }
+  };
+
+  // child_added で既存分も来る（キー順で来るが、念のため createdAt で並べる）
+  ref.on("child_added", handler);
+  transferUnsub = () => ref.off("child_added", handler);
+}
+
+
+// 履歴：次の1件を表示する関数
+async function showNextReceiveIfNeeded(){
+  if (receiveShowing) return;
+  if (!receiveQueue.length) return;
+
+  // 古い順（createdAt優先、同値はid）
+  receiveQueue.sort((a,b) => {
+    const ac = Number(a.req?.createdAt ?? 0);
+    const bc = Number(b.req?.createdAt ?? 0);
+    if (ac !== bc) return ac - bc;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  const next = receiveQueue.shift();
+  if (!next) return;
+
+  receiveShowing = true;
+
+  const req = next.req;
+  currentReceiveReqId = next.id;
+
+  // 名前表示用
+  const eSnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+  const ep = eSnap.val() || {};
+  const fromName = ep[req.fromPlayerId]?.name ?? req.fromPlayerId;
+  const toName   = ep[req.toPlayerId]?.name ?? req.toPlayerId;
+
+  setText("recvFromName", fromName);
+  setText("recvToName", toName);
+  setText("recvPoint", String(req.point ?? "-"));
+  setText("recvToBefore", String(req.toBefore ?? "-"));
+  setText("recvToAfter", String(req.toAfter ?? "-"));
+
+  openReceiveSheet();
+}
+
+
+// ===============================
+// 対局終了ボタン
+// ===============================
+async function endGame() {
+  try {
+    if (!currentRoomId) return;
+    if (isSpectatorMode) return;
+
+    const myPid = myPlayerId || currentGameInfo.playerId;
+    if (!myPid) return;
+
+    const myStatusRef = db.ref(`rooms/${currentRoomId}/players/${myPid}/status`);
+
+    // 1) 現在の自分statusを確認（playing のときだけ calculating にする）
+    const stSnap = await myStatusRef.once("value");
+    const cur = stSnap.val();
+
+    if (cur !== "playing") {
+      console.log("[endGame] skipped: status is not playing", { cur });
+      alert("対局終了しています。");
+      return;
+    }
+
+    // 1.5) 全員が returnPoint 以上かチェック
+    const [playersSnap, configSnap] = await Promise.all([
+      db.ref(`rooms/${currentRoomId}/players`).once("value"),
+      db.ref(`rooms/${currentRoomId}/gameConfig`).once("value"),
+    ]);
+
+    const players = playersSnap.val() || {};
+    const gameConfig = configSnap.val() || {};
+
+    const returnPoint = Number(gameConfig.returnPoint || 0);
+
+    // 参加者のみ：全員が returnPoint 未満か？
+    const notReached = Object.values(players)
+      .filter(p => p?.direction) // 参加者のみ
+      .every(p => Number(p.point || 0) < returnPoint);
+
+    if (notReached) {
+      alert(`誰も${returnPoint}点に達していないため終了できません`);
+      return;
+    }
+
+    if(!confirm("対局を終了しますか？")) return;
+
+    // 2) calculating へ更新（set を使用）
+    await myStatusRef.set("calculating");
+
+    const need = (gameConfig.rule === "3") ? 3 : 4;
+
+    // 参加者のみ（directionがある人）を対象に counting
+    const calcCount = Object.values(players)
+      .filter(p => p?.direction)
+      .filter(p => p?.status === "calculating")
+      .length + 1; // ← 今回自分が calculating になった分を加算
+
+    // 3) 最後の人が押したら roomStatus を calculating に（set を使用）
+    if (calcCount >= need) {
+      await db.ref(`rooms/${currentRoomId}/gameConfig/status`).set("calculating");
+      // subscribeRoomStatus() が全員を集計中画面へ遷移させる想定
+    }
+
+  } catch (e) {
+    console.error("endGame error:", e);
+    alert("対局終了の更新に失敗しました。\n" + (e?.message ?? e));
+  }
+}
+
+// ================================================
+// GAS連携　スプレッドシートへデータ書き込み
+// ================================================
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyqghF0B_hau72utvGgNXu7k_n9lr0TJJEYFezIukl5wgkbEtgt0O8KRnGJqZZ_9b1MVw/exec";
+const GAS_TOKEN = "a809ef3d-639b-449c-847b-326d59743eca"
+
+async function requestGASApp(request) {
+
+  // ★これでCORSエラーは出ません（ただしレスポンスは読めない）
+  fetch(GAS_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify({ "token": GAS_TOKEN, "request": request }),
+  }).catch(console.error);
+}
+
+function openCalculatingScreen() {
+  // 画面切替
+  loginScreen?.classList.add("hidden");
+  roomListScreen?.classList.add("hidden");
+  addPlayerScreen?.classList.add("hidden");
+  gameScreen?.classList.add("hidden");
+  calculatingScreen.classList.remove("hidden");
+
+  subscribeCalculating();
+}
+
+function subscribeCalculating() {
+  if (!currentRoomId) return;
+
+  if (calcUnsub) calcUnsub();
+
+  const playersRef = db.ref(`rooms/${currentRoomId}/players`);
+  const configRef  = db.ref(`rooms/${currentRoomId}/gameConfig`);
+  const entryRef   = db.ref(`systemConfig/entryPlayers`);
+
+  const handler = async () => {
+    const [pSnap, cSnap, eSnap] = await Promise.all([
+      playersRef.once("value"),
+      configRef.once("value"),
+      entryRef.once("value"),
+    ]);
+    renderCalculatingUI(pSnap.val() || {}, cSnap.val() || {}, eSnap.val() || {});
+    checkAllEndAndClose(pSnap.val() || {}, cSnap.val() || {});
+  };
+
+  playersRef.on("value", handler);
+  configRef.on("value", handler);
+
+  calcUnsub = () => {
+    playersRef.off("value", handler);
+    configRef.off("value", handler);
+  };
+
+  handler();
+}
+
+
+function resolvePosPids(players) {
+  const myPid = currentGameInfo.playerId;
+  const myDir = currentGameInfo.direction;
+  const out = { ME: myPid, N: null, W: null, S: null };
+
+  for (const [pid, p] of Object.entries(players)) {
+    if (!p?.direction) continue;
+    if (pid === myPid) continue;
+
+    const rel = toRelative(myDir, p.direction); // 'N'|'W'|'S' を返すやつ
+    if (rel) out[rel] = pid;
+  }
+  return out;
+}
+
+
+function calcScoreUnits(point, returnPoint) {
+  return Math.ceil((Number(point || 0) - Number(returnPoint || 0)) / 1000);
+}
+
+
+function renderCalculatingUI(players, gameConfig, entryPlayers) {
+  const pos = resolvePosPids(players);
+  const returnPoint = Number(gameConfig.returnPoint || 0);
+
+  // 4人分（ME/N/W/S）を配列化（存在しない席は除外）
+  const list = ["ME","N","W","S"]
+    .map(k => ({ k, pid: pos[k], p: pos[k] ? players[pos[k]] : null }))
+    .filter(x => x.pid && x.p);
+
+  // 名前表示（方角 + name）
+  const nameOf = (pid) => entryPlayers[pid]?.name ?? "不明";
+  const dirOf  = (pid) => players[pid]?.direction ?? "-";
+
+  // 表示：005/006/007/008
+  // ★縦並び（innerHTML）
+  if (pos.N)  document.getElementById("calcTopName").innerHTML   = `<div>${dirOf(pos.N)}家</div><div>${nameOf(pos.N)}</div>`;
+  if (pos.W)  document.getElementById("calcLeftName").innerHTML  = `<div>${dirOf(pos.W)}家</div><div>${nameOf(pos.W)}</div>`;
+  if (pos.S)  document.getElementById("calcRightName").innerHTML = `<div>${dirOf(pos.S)}家</div><div>${nameOf(pos.S)}</div>`;
+  if (pos.ME) document.getElementById("calcMyName").innerHTML    = `<div>${dirOf(pos.ME)}家</div><div>${nameOf(pos.ME)}</div>`;;
+
+  // まず②の計算（全員分）
+  const base = {};
+  for (const x of list) {
+    const u = calcScoreUnits(x.p.point, returnPoint);
+    base[x.k] = u + (x.p.yakitoriFlg === true ? -10 : 0);
+  }
+
+  // トップ判定は point の最大
+  let topK = null;
+  let topPoint = -Infinity;
+  for (const x of list) {
+    const pt = Number(x.p.point || 0);
+    if (pt > topPoint) { topPoint = pt; topK = x.k; }
+  }
+
+  // ①トップは「他人合計×-1」
+  if (topK) {
+    const othersSum = Object.entries(base)
+      .filter(([k]) => k !== topK)
+      .reduce((acc, [,v]) => acc + Number(v||0), 0);
+
+    base[topK] = -1 * othersSum;
+  }
+
+  // 表示：009/010/011/012
+  setText("calcTopScore",  pos.N  ? String(base["N"] ?? "-")  : "-");  // 010
+  setText("calcLeftScore", pos.W  ? String(base["W"] ?? "-")  : "-");  // 009
+  setText("calcRightScore",pos.S  ? String(base["S"] ?? "-")  : "-");  // 011
+  setText("calcMyScore",   pos.ME ? String(base["ME"] ?? "-") : "-");  // 012
+
+  // 001-004 ヤキトリボタン表示（trueなら「ヤキトリ」、falseなら空表示）
+  setYakitoriButton("btnYakitoriTop",   pos.N,  players);
+  setYakitoriButton("btnYakitoriLeft",  pos.W,  players);
+  setYakitoriButton("btnYakitoriRight", pos.S,  players);
+  setYakitoriButton("btnYakitoriMe",    pos.ME, players);
+
+  // rooms/{roomId}/gameConfig/status == end の場合ボタン非活性
+  const isRoomEnd = (gameConfig.status === "end");
+
+  // player/{id}/status == "end" の人はヤキトリ操作不可（個別判定）
+  const isPlayerEnd = (pid) => !!pid && players?.[pid]?.status === "end";
+
+  // 集計中画面では「自分(ME)以外のヤキトリボタンは操作不可」
+  const myPid = pos.ME;
+
+  const yakitoriMap = [
+    ["btnYakitoriTop",   pos.N],
+    ["btnYakitoriLeft",  pos.W],
+    ["btnYakitoriRight", pos.S],
+    ["btnYakitoriMe",    pos.ME],
+  ];
+
+  for (const [btnId, pid] of yakitoriMap) {
+    const b = document.getElementById(btnId);
+    if (!b) continue;
+
+    const isOther = !!pid && pid !== myPid; // 自分以外
+    b.disabled = isRoomEnd || isPlayerEnd(pid) || isOther;
+  }
+
+  // 集計完了ボタンは部屋endで無効化
+  const endBtn = document.getElementById("btnCalcEnd");
+  if (endBtn) endBtn.disabled = isRoomEnd;
+
+}
+
+function computeScoresForRoom(players, gameConfig) {
+  const returnPoint = Number(gameConfig.returnPoint || 0);
+
+  // 参加者だけ抽出（directionがある人）
+  const active = Object.entries(players || {})
+    .filter(([pid, p]) => p?.direction) // 参加者のみ
+    .map(([pid, p]) => ({ pid, p }));
+
+  if (active.length === 0) return {};
+
+  // ②：ceil((point-returnPoint)/1000) + (yakitoriFlg===true ? -10 : 0)
+  const base = {};
+  for (const { pid, p } of active) {
+    const u = Math.ceil((Number(p.point || 0) - returnPoint) / 1000);
+    base[pid] = u + (p.yakitoriFlg === true ? -10 : 0);
+  }
+
+  // ①：point最大の人をトップとし、他人の合計×-1
+  let topPid = active[0].pid;
+  let topPoint = Number(active[0].p.point || 0);
+  for (const { pid, p } of active) {
+    const pt = Number(p.point || 0);
+    if (pt > topPoint) { topPoint = pt; topPid = pid; }
+  }
+
+  const othersSum = Object.entries(base)
+    .filter(([pid]) => pid !== topPid)
+    .reduce((acc, [,v]) => acc + Number(v || 0), 0);
+
+  base[topPid] = -1 * othersSum;
+
+  return base; // { pid: score, ... }
+}
+
+function setYakitoriButton(btnId, pid, players) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+
+  const img = btn.querySelector(".yakitoriBtnImg");
+
+  // pidなし/データなしなら無効化＆非表示
+  if (!pid || !players[pid]) {
+    btn.disabled = true;
+    if (img) img.style.visibility = "hidden";
+    return;
+  }
+
+  btn.disabled = false;
+  if (img) img.style.visibility = "visible";
+
+  const flg = players[pid].yakitoriFlg === true;
+  const src = flg ? "image/yakitori_on.png" : "image/yakitori_off.png";
+
+  if (img && !img.src.endsWith(src)) img.src = src;
+}
+
+
+
+async function toggleYakitoriByPos(which) {
+  const pSnap = await db.ref(`rooms/${currentRoomId}/players`).once("value");
+  const players = pSnap.val() || {};
+  const pos = resolvePosPids(players);
+
+  const pid = (which === "ME") ? pos.ME : pos[which];
+  if (!pid) return;
+
+  // どのボタンをflipさせるか
+  const btnId =
+    which === "N"  ? "btnYakitoriTop" :
+    which === "W"  ? "btnYakitoriLeft" :
+    which === "S"  ? "btnYakitoriRight" :
+    /* ME */         "btnYakitoriMe";
+
+  const cur = players[pid]?.yakitoriFlg === true;
+  const next = !cur;
+
+  // 先にアニメーション（体感を良くする）
+  flipYakitoriBtn(btnId, next);
+
+  // DB更新（リアルタイム購読で最終的に正しい状態に収束）
+  const ref = db.ref(`rooms/${currentRoomId}/players/${pid}/yakitoriFlg`);
+  await ref.set(next);
+}
+
+
+async function finishCalculating() {
+  const pid = currentGameInfo.playerId;
+  if (!pid) return;
+  await db.ref(`rooms/${currentRoomId}/players/${pid}/status`).set("end");
+  alert("集計完了を送信しました。");
+}
+
+
+async function checkAllEndAndClose(players, gameConfig) {
+  if (!currentRoomId) return;
+
+  // すでに終了確定済みなら何もしない（多重実行防止）
+  if (gameConfig.status === "end") return;
+
+  const endCount = Object.values(players || {}).filter(p => p?.status === "end").length;
+  const need = (currentRule === "3") ? 3 : 4;
+  if (endCount < need) return;
+
+  // ★最後の人が複数同時に入ることがあるので status を先に確認してガード
+  const statusRef = db.ref(`rooms/${currentRoomId}/gameConfig/status`);
+  const stSnap = await statusRef.once("value");
+  const st = stSnap.val();
+  if (st === "end") return;
+
+  // score計算（表示と同じ）
+  const scores = computeScoresForRoom(players, gameConfig);
+
+  // players/{pid}/score に一括反映（multi-location update）
+  const updates = {};
+  for (const [pid, sc] of Object.entries(scores)) {
+    updates[`rooms/${currentRoomId}/players/${pid}/score`] = sc;
+  }
+
+  // ついでに status を end にする（集計完了の確定）
+  updates[`rooms/${currentRoomId}/gameConfig/status`] = "end";
+
+  await db.ref().update(updates);
+
+  // GAS連携処理　スプレッドシートへ書き込み依頼
+  // --- createdAt → "YYYY-MM-DD"（JST基準）
+  const createdAt = gameConfig?.createdAt;
+  const date = createdAt
+    ? (() => {
+        const d = new Date(createdAt);
+        // 例: "2026/02/04" → "2026-02-04"
+        return new Intl.DateTimeFormat("ja-JP", {
+          timeZone: "Asia/Tokyo",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(d).replaceAll("/", "-");
+      })()
+    : "";
+
+  // --- systemConfig/entryPlayers と突合して dataList を作成
+  const entrySnap = await db.ref(`systemConfig/entryPlayers`).once("value");
+  const entryPlayers = entrySnap.val() || {};
+
+  // directionは考慮しない：players と entryPlayers の playerId が一致するものだけ
+  const dataList = Object.entries(players)
+    .filter(([pid]) => entryPlayers?.[pid])   // entryPlayersに存在するIDのみ
+    .map(([pid, p]) => ({
+      name: entryPlayers[pid]?.name ?? "",
+      score: Number(p?.score ?? 0),
+    }));
+
+  // --- データ整形（例のJSON形式）
+  const payload = { "date": date, "dataList": dataList };
+
+  // 必要ならDBへ保持（後続処理でGASへ送る等に使える）
+  await db.ref(`rooms/${currentRoomId}/gameConfig/resultPayload`).set(payload);
+
+  requestGASApp(payload);
+
+  alert("全員の集計完了が揃いました。スコアを保存しました（対局終了画面は未作成）");
+  openEndScreen();
+}
+
+
+
+// ===============================
+// 対局終了画面：リアルタイム購読
+// ===============================
+function openEndScreen() {
+  // 画面切替
+  loginScreen?.classList.add("hidden");
+  roomListScreen?.classList.add("hidden");
+  addPlayerScreen?.classList.add("hidden");
+  gameScreen?.classList.add("hidden");
+  calculatingScreen?.classList.add("hidden");
+  endScreen.classList.remove("hidden");
+
+  subscribeEndScreen();
+}
+
+function subscribeEndScreen() {
+  if (!currentRoomId) return;
+
+  if (endUnsub) endUnsub();
+
+  const playersRef = db.ref(`rooms/${currentRoomId}/players`);
+  const configRef  = db.ref(`rooms/${currentRoomId}/gameConfig`);
+  const entryRef   = db.ref(`systemConfig/entryPlayers`);
+
+  const handler = async () => {
+    const [pSnap, cSnap, eSnap] = await Promise.all([
+      playersRef.once("value"),
+      configRef.once("value"),
+      entryRef.once("value"),
+    ]);
+
+    renderEndScreen(pSnap.val() || {}, cSnap.val() || {}, eSnap.val() || {});
+  };
+
+  playersRef.on("value", handler);
+  configRef.on("value", handler);
+
+  endUnsub = () => {
+    playersRef.off("value", handler);
+    configRef.off("value", handler);
+  };
+
+  handler();
+}
+
+function renderEndScreen(players, gameConfig, entryPlayers) {
+  // 001 ルール表示
+  const ruleMap = { "3":"3麻", "3r4":"3麻4人回", "4":"4麻" };
+  const ruleText = ruleMap[gameConfig.rule] || gameConfig.rule || "-";
+  const ruleBtn = document.getElementById("endRuleBtn");
+  if (ruleBtn) ruleBtn.textContent = ruleText;
+
+  // 002,003 原点/返し点
+  setText("endStartPoint", gameConfig.startPoint ?? "-");
+  setText("endReturnPoint", gameConfig.returnPoint ?? "-");
+
+  // 参加者（directionがある人）だけを対象に、score降順で並べる
+  const list = Object.entries(players || {})
+    .filter(([pid, p]) => p?.direction) // 参加者
+    .map(([pid, p]) => ({
+      pid,
+      name: entryPlayers?.[pid]?.name ?? "不明",
+      score: (p.score ?? null),
+      yakitori: (p.yakitoriFlg === true),
+      point: Number(p.point ?? 0),
+    }))
+    // scoreが未計算（null）の人は最後に回す
+    .sort((a, b) => {
+      const as = (a.score === null || a.score === undefined) ? -Infinity : Number(a.score);
+      const bs = (b.score === null || b.score === undefined) ? -Infinity : Number(b.score);
+      if (bs !== as) return bs - as;
+      // 同点なら point で安定化（任意）
+      return (b.point - a.point);
+    });
+
+  // 3麻なら4位枠を隠す（見た目の要望がある場合）
+  const is3 = (gameConfig.rule === "3");
+  const rank4Box = document.getElementById("rank4Box");
+  if (rank4Box) rank4Box.style.display = is3 ? "none" : "block";
+
+  // 004-011, 012-015 埋める
+  const ranks = [
+    { nameId:"rank1Name", scoreId:"rank1Score", yId:"rank1Yakitori" },
+    { nameId:"rank2Name", scoreId:"rank2Score", yId:"rank2Yakitori" },
+    { nameId:"rank3Name", scoreId:"rank3Score", yId:"rank3Yakitori" },
+    { nameId:"rank4Name", scoreId:"rank4Score", yId:"rank4Yakitori" },
+  ];
+
+  const showCount = is3 ? 3 : 4;
+
+  for (let i = 0; i < ranks.length; i++) {
+    const r = ranks[i];
+    const row = list[i];
+
+    if (i >= showCount) {
+      // 3麻の4位は非表示想定だが、念のためクリア
+      setText(r.nameId, "-");
+      setText(r.scoreId, "-");
+      setText(r.yId, "");
+      continue;
+    }
+
+    if (!row) {
+      setText(r.nameId, "-");
+      setText(r.scoreId, "-");
+      setText(r.yId, "");
+      continue;
+    }
+
+    setText(r.nameId, row.name);                 // 004-007
+    setText(r.scoreId, row.score ?? "-");        // 008-011
+    setText(r.yId, row.yakitori ? "ヤキトリ" : ""); // 012-015
+  }
+}
+
+// 画面離脱時は購読解除
+function stopAllSubscriptions() {
+  const safelyOff = (fnName) => {
+    try {
+      const fn = window[fnName];
+      if (typeof fn === "function") fn();
+    } catch {}
+  };
+
+  // 変数型unsubscribeの典型（ローカル変数）
+  if (roomsUnsub) { roomsUnsub(); roomsUnsub = null; }
+  if (entryPlayersUnsub) { entryPlayersUnsub(); entryPlayersUnsub = null; }
+  if (gameStateUnsub) { gameStateUnsub(); gameStateUnsub = null; }
+  if (transferUnsub) { transferUnsub(); transferUnsub = null; }
+  if (historyUnsub) { historyUnsub(); historyUnsub = null; }
+  if (calcUnsub) { calcUnsub(); calcUnsub = null; }
+  if (endUnsub) { endUnsub(); endUnsub = null; }
+  if (statusUnsub) { statusUnsub(); statusUnsub = null; }
+  if (gyakuUnsub) { gyakuUnsub(); gyakuUnsub = null; }
+}
+
+
+
+// ------------------- DB削除 -------------------
+function deleteRoom(roomId) {
+  if(!confirm("このルームを削除しますか？")) return;
+  // 物理削除
+  db.ref(`rooms/${roomId}`).remove();
+  // 論理削除
+  // db.ref(`rooms/${roomId}/gameConfig/status`).set("delete");
+  db.ref(`rooms/${roomId}`).remove();
+}
+
+
+
+// ================= 戻る =================
+function backToPlayerSetup() {
+  addPlayerScreen.classList.add("hidden");
+
+  if (addPlayerReturnTo === "playerConfig") {
+    openPlayerConfigScreen("");
+    return;
+  }
+  // それ以外はルーム一覧へ
+  showRoomListScreen();
+}
+
+
+// ルーム一覧画面への遷移
+function backToRoomList() {
+  try {
+    // 先に購読解除（画面切替前に安全に）
+    if (calcUnsub) { calcUnsub(); calcUnsub = null; }
+    if (statusUnsub) { statusUnsub(); statusUnsub = null; }
+    if (gameStateUnsub) { gameStateUnsub(); gameStateUnsub = null; }
+    if (endUnsub) { endUnsub(); endUnsub = null; }
+    if (roomsUnsub) { roomsUnsub(); roomsUnsub = null; }
+    if (entryPlayersUnsub) { entryPlayersUnsub(); entryPlayersUnsub = null; } // ★追加（任意）
+
+    hideAllScreens();
+
+    // ★保存するscreen名は実在するIDに合わせる
+    saveAppState("roomListScreen");
+
+    roomListScreen.classList.remove("hidden");
+
+    // 一覧描画
+    subscribeEntryPlayers();
+    subscribeRooms();
+  } catch (e) {
+    console.error("backToRoomList error:", e);
+
+    // ★最悪でも roomList は出す（真っ白回避）
+    hideAllScreens();
+    roomListScreen.classList.remove("hidden");
+    alert("画面遷移でエラー。コンソールの backToRoomList error を確認してください。");
+  }
+}
+
+
+// 画面縦横調整用
+function applyOrientationClass(){
+  const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+  document.documentElement.classList.toggle("is-landscape", isLandscape);
+  document.documentElement.classList.toggle("is-portrait", !isLandscape);
+}
+
+window.addEventListener("load", applyOrientationClass);
+window.addEventListener("resize", applyOrientationClass);
+window.addEventListener("orientationchange", applyOrientationClass);
+
+
+// sessionStorageに必要な情報格納
+function saveAppState(screen) {
+  sessionStorage.setItem(APP_STATE_KEY, JSON.stringify({
+    loggedIn: true,
+    screen,
+    roomId: currentRoomId ?? null,
+    currentGameInfo: currentGameInfo ?? {},
+    myDeviceId: myDeviceId ?? null,
+    myPlayerId: myPlayerId ?? null
+  }));
+}
+
+window.addEventListener("load", async () => {
+
+  // Service Worker 登録（そのまま）
+  if ("serviceWorker" in navigator) {
+    try {
+      await navigator.serviceWorker.register("/sw.js");
+      console.log("SW registered");
+    } catch (e) {
+      console.log("SW register failed:", e);
+    }
+  }
+
+  const stateStr = sessionStorage.getItem(APP_STATE_KEY);
+  if (!stateStr) return;
+
+  let state;
+  try { state = JSON.parse(stateStr); }
+  catch {
+    sessionStorage.removeItem(APP_STATE_KEY);
+    return;
+  }
+
+  if (!state.loggedIn) return;
+
+  // ★ログイン済みなら、deviceMap判定へ
+  await bootstrapAfterLogin();
+});
+
+let vhT1 = null;
+let vhT2 = null;
+let vhT3 = null;
+
+function isPortraitNow() {
+  // orientationchange直後は innerWidth/innerHeight が嘘をつくことがあるので、
+  // visualViewport があればそっち優先
+  const vv = window.visualViewport;
+  if (vv) return vv.height >= vv.width;
+  return window.matchMedia("(orientation: portrait)").matches;
+}
+
+function setRealVH(){
+  const vv = window.visualViewport;
+  const baseH = (vv?.height ?? window.innerHeight);
+
+  const isPortrait = vv ? (vv.height >= vv.width) : (window.innerHeight >= window.innerWidth);
+
+  const adjustedH = baseH - (isPortrait ? 100 : 30);
+  document.documentElement.style.setProperty("--vh", `${adjustedH * 0.01}px`);
+}
+
+// 端末が回転した直後は値が揺れることがあるので、
+// 1回 + 次フレーム + 少し後(保険) で再計算
+function refreshVH(){
+  setRealVH();
+  requestAnimationFrame(setRealVH);
+  setTimeout(setRealVH, 200);
+}
+
+// 初期化
+refreshVH();
+
+// 既存：リサイズ
+window.addEventListener("resize", refreshVH);
+window.visualViewport?.addEventListener("resize", refreshVH);
+
+// ★追加：縦横切替のたびに実行（これが目的）
+window.addEventListener("orientationchange", refreshVH);
+
+// （任意：iOS Safari対策）ページが戻ってきた時にも再計算
+window.addEventListener("pageshow", refreshVH);
+
+
+</script>
+</body>
+</html>
